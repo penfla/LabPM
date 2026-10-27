@@ -8,13 +8,15 @@ Feature set modelled on dependent tasks, instrument conflicts, hours per person,
 |---|---|
 | Live demo | https://penfla.github.io/labpm/ (after enabling GitHub Pages, see [Deployment](#deployment)) |
 | Repository | https://github.com/penfla/labpm |
-| Version | 1.2.0 |
+| Version | 1.3.0 |
 | Licence | [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0) |
 | Commercial use | penfla@me.com |
 
 ![Dashboard](docs/img/dashboard.png)
 
 ![Task filters and Excel export](docs/img/tasks-export.png)
+
+![Files page](docs/img/files.png)
 
 ## Features
 
@@ -33,6 +35,8 @@ Feature set modelled on dependent tasks, instrument conflicts, hours per person,
 | Roles | Admin, Project manager, Researcher, Viewer (UI-level, see [limitations](#limitations)) |
 | Autosave | Every change (including each keystroke in notes/documents) is written to `localStorage`. Optional **backup folder** of your choice: initial copy of the database on connection, then `labpm-autosave.json` updated after every change (Chromium browsers) |
 | Excel export | **Export Excel** on the Tasks page writes the tasks matching the current filters (search, project, assignee, status, priority, due-date range) to `.xlsx` with header, frozen row, autofilter, real dates and numbers, plus an *Export info* sheet listing the filters |
+| Attachments | **Files** page in the side menu and an *Attachments* section in every task. Files are **copied** into `<backup folder>/attachments/<task-or-project>/`, i.e. next to `labpm-autosave.json`; the database stores name, size, path, author, date. Open, save a copy, remove link |
+| Empty database | `empty-database/labpm-empty.json` and an in-app *Download empty database file*; **Clear all project data** (Admin) wipes projects/tasks/docs/rules (with automatic snapshot and folder copy first) |
 | Sessions | Up to 12 named snapshots in the browser; export/import as `.json` |
 | Theme | Light / dark / auto |
 
@@ -57,7 +61,9 @@ Sample data is seeded relative to the current week on first load. *Settings → 
 
 - State lives in the browser's `localStorage` (`labpm_v1`); snapshots in `labpm_snaps_v1`. Nothing is sent to any server.
 - Browsers can evict storage. **Connect a backup folder (*Session → Backup folder → Choose folder…*) before you start entering data**: LabPM writes `labpm-initial-<date>.json` (state at connection) and then keeps `labpm-autosave.json` current after every change. Requires a Chromium-based browser (Chrome, Edge); the browser asks permission again after a restart. Elsewhere use *Session → Save to file (.json)*, which is also how you move work between computers.
-- Files in the folder are plain, unencrypted JSON: pick a folder with suitable access control (NDA data).
+- Files in the folder (database JSON **and attachments**) are unencrypted: pick a folder with suitable access control (NDA data).
+- **Attachments need a connected backup folder.** They are copied to `<folder>/attachments/task-<title>-<id>/` (or `project-<name>-<id>/` for project-level files). LabPM never deletes files from the folder; removing an attachment or clearing the database only drops the links.
+- To start from scratch: open `empty-database/labpm-empty.json` (*Session → Open from file*, Admin) or use *Clear all project data*.
 - Opening a file or restoring a snapshot replaces current data (Admin only) after an automatic snapshot. Imported JSON is validated and sanitised (`normSession`).
 - Schema: [docs/DATA_MODEL.md](docs/DATA_MODEL.md).
 
@@ -86,7 +92,7 @@ npx playwright install chromium
 npm test
 ```
 
-Playwright smoke tests (`tests/smoke.test.js`): all views render without JS errors, English-only UI, request intake, template instantiation with dependency arrows, session export, role restriction, filtered Excel export, backup-folder initial copy and per-keystroke autosave (in-memory folder stub). CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+Playwright smoke tests (`tests/smoke.test.js`): all views render without JS errors, English-only UI, request intake, template instantiation with dependency arrows, session export, role restriction, filtered Excel export, backup-folder initial copy and per-keystroke autosave, attachments (task drawer and Files page, name collisions, link removal, save copy), empty database and clear-all (in-memory folder stub). CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ## Limitations
 
@@ -104,7 +110,7 @@ Playwright smoke tests (`tests/smoke.test.js`): all views render without JS erro
 | | |
 |---|---|
 | Author | Flavio Pendolino |
-| Version | 1.2.0 |
+| Version | 1.3.0 |
 | License | PolyForm Noncommercial 1.0.0 |
 | Commercial use | penfla@me.com |
 | Purpose | Project, task, resource and request management for a chemical/polymer laboratory |

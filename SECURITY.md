@@ -10,6 +10,7 @@ LabPM is a client-side single-page app. It has no server, no accounts, no networ
 | Malicious session file / pasted JSON | `normSession()` validates schema version, array sizes (≤ 5000), ID pattern `^[A-Za-z0-9_-]{1,40}$`, ISO dates, enumerations; coerces all strings; file size ≤ 5 MB; automatic snapshot before replacement |
 | Formula fields | Recursive-descent arithmetic parser (`+ - * / ()`, numbers); no `eval` / `Function` |
 | Backup folder | Requires a user gesture and the browser's own read/write permission prompt; the app only creates/overwrites files with its own fixed names (`labpm-*.json`) and never reads or lists the folder; handle kept in IndexedDB |
+| Attachments | Stored paths are re-validated (`attachments/` prefix, no `.`/`..`/empty segments) before any folder access; names are sanitised; files are only created, never overwritten or deleted by the app. Opened via blob URL in a new tab or downloaded; no content is parsed or executed by LabPM. Treat attachments as untrusted files (macro-enabled Office files, etc.) |
 | Exfiltration | CSP blocks `connect-src`, images (except `data:`), frames, forms |
 
 ## What it is not

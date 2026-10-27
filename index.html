@@ -4,11 +4,11 @@ Copyright (c) 2026 Flavio Pendolino
 https://polyformproject.org/licenses/noncommercial/1.0.0
 
 Author: Flavio Pendolino
-Version: 1.2
+Version: 1.3
 License: PolyForm Noncommercial 1.0.0
 Commercial use: penfla@me.com
 Purpose: Project, task, resource and request management for a chemical/polymer laboratory.
-Method: Single-file HTML, vanilla JavaScript; data in browser localStorage, optional autosave to a user-chosen folder (File System Access API); sessions saved as local snapshots or JSON files; task export as .xlsx (OOXML written in-page). Deterministic calculations.
+Method: Single-file HTML, vanilla JavaScript; data in browser localStorage, optional autosave to a user-chosen folder (File System Access API); attachments copied into an 'attachments' subfolder of that folder; sessions saved as local snapshots or JSON files; task export as .xlsx (OOXML written in-page). Deterministic calculations.
 Disclaimer: validate the results against your own reference samples before any analytical, engineering, safety or regulatory use.
 Third-party components: IBM Plex Sans, IBM Plex Mono, Bricolage Grotesque (Google Fonts, SIL OFL 1.1).
 Scientific references: ASTM D3418, ISO 11357-3, ISO 1133-1, ISO 527-3, ASTM D3985 (cited in the templates).
@@ -183,9 +183,9 @@ var SCOL={'Triage':'--s0','To do':'--s1','In progress':'--s2','In review':'--s3'
 var PRIOS=['Low','Medium','High','Critical'];
 var ROLES=['Admin','Project manager','Researcher','Viewer'];
 var TOOLS=['DSC','TGA','FTIR','Rheometer','Extruder','MFR','Tensile tester','OTR','Other'];
-var NAV=[['Work',[['dashboard','Dashboard'],['tasks','Tasks'],['requests','Requests']]],['Planning',[['portfolio','Portfolio'],['templates','Templates'],['automations','Automations'],['docs','Documents']]],['System',[['session','Session'],['settings','Settings'],['info','Info & license']]]];
+var NAV=[['Work',[['dashboard','Dashboard'],['tasks','Tasks'],['files','Files'],['requests','Requests']]],['Planning',[['portfolio','Portfolio'],['templates','Templates'],['automations','Automations'],['docs','Documents']]],['System',[['session','Session'],['settings','Settings'],['info','Info & license']]]];
 var NAVFLAT=[].concat.apply([],NAV.map(function(g){return g[1]}));
-var DESC={dashboard:'Project status, deadlines and team workload.',tasks:'Tasks across all projects: pick the view you prefer.',requests:'Analysis requests and triage queue.',portfolio:'Project progress and goals.',templates:'Start a project from a ready-made scheme.',automations:'Rules that update tasks automatically.',docs:'Notes and documents linked to projects and tasks.',session:'Save your work, reopen it later or move it to another computer.',settings:'People, roles, custom fields and integrations.',info:'Author, license and references.'};
+var DESC={dashboard:'Project status, deadlines and team workload.',tasks:'Tasks across all projects: pick the view you prefer.',requests:'Analysis requests and triage queue.',files:'Attach files to tasks and projects; copies are stored next to the database.',portfolio:'Project progress and goals.',templates:'Start a project from a ready-made scheme.',automations:'Rules that update tasks automatically.',docs:'Notes and documents linked to projects and tasks.',session:'Save your work, reopen it later or move it to another computer.',settings:'People, roles, custom fields and integrations.',info:'Author, license and references.'};
 var MAXSNAP=12;
 var TVIEWS=[['list','List'],['board','Board'],['timeline','Timeline'],['calendar','Calendar'],['workload','Workload']];
 var WN={kpi:'Indicators',status:'Task status',hours:'Hours per project',load:'6-week workload',upcoming:'Upcoming deadlines',conflicts:'Instrument conflicts',assistant:'Project summary'};
@@ -249,7 +249,7 @@ function seed(){
    {id:'r2',name:'Flag overdue tasks',on:true,trigger:{type:'overdue',value:''},cond:{type:'none',value:''},action:{type:'add_tag',value:'overdue'}},
    {id:'r3',name:'New requests to triage',on:true,trigger:{type:'created',value:''},cond:{type:'project',value:'p4'},action:{type:'set_status',value:'Triage'}}];
   var docs=[{id:'d1',title:'Campaign 03 plan',projectId:'p1',taskId:null,updated:Date.now(),body:'# Campaign 03 plan\n\n- Matrix: PP homopolymer, MAH 1.0 wt%\n- Thermal profile and screw speed: see extrusion log\n- Characterization: DSC, FTIR, MFR\n\n**Acceptance criterion**: to be defined with the laboratory manager.'}];
-  return {v:1,me:'u1',users:users,projects:projects,tasks:tasks,fields:fields,rules:rules,goals:goals,docs:docs,activity:[],ui:defaultUI(),demo:true};
+  return {v:1,me:'u1',users:users,projects:projects,tasks:tasks,fields:fields,rules:rules,goals:goals,docs:docs,files:[],activity:[],ui:defaultUI(),demo:true};
 }
 
 
@@ -276,6 +276,7 @@ function normSession(o){
   o.rules.forEach(function(r){r.name=S1(r.name);r.on=!!r.on;r.trigger.value=S1(r.trigger.value);r.cond.value=S1(r.cond.value);r.action.value=S1(r.action.value)});
   o.goals.forEach(function(g){g.name=S1(g.name);if(!DT.test(S1(g.target)))g.target=iso(new Date());g.pids=Array.isArray(g.pids)?g.pids.filter(function(x){return typeof x==='string'&&ID.test(x)}):[]});
   o.docs.forEach(function(d){d.title=S1(d.title);d.body=S1(d.body);d.projectId=S1(d.projectId);d.taskId=S1(d.taskId);d.updated=Number(d.updated)||Date.now()});
+  o.files=(Array.isArray(o.files)?o.files:[]).filter(function(f){return f&&typeof f==='object'&&typeof f.id==='string'&&ID.test(f.id)&&typeof f.path==='string'}).slice(0,5000).map(function(f){return {id:f.id,taskId:S1(f.taskId),projectId:S1(f.projectId),name:S1(f.name),path:S1(f.path),size:Math.max(0,Number(f.size)||0),type:S1(f.type),added:Number(f.added)||0,by:S1(f.by)}});
   o.activity=(Array.isArray(o.activity)?o.activity:[]).filter(function(a){return a&&typeof a==='object'}).slice(0,300).map(function(a){return {t:Number(a.t)||0,u:S1(a.u),m:S1(a.m)}});
   if(!o.users.some(function(u){return u.id===o.me}))o.me=o.users[0]?o.users[0].id:'';
   var d0=defaultUI(),u=o.ui&&typeof o.ui==='object'?o.ui:{};
@@ -286,7 +287,8 @@ function normSession(o){
   if(!/^\d{4}-\d{2}$/.test(S1(u.cal)))u.cal=defaultUI().cal;
   ['q','fp','fa','fs','fpr','group'].forEach(function(k){u[k]=S1(u[k])});
   ['fdf','fdt'].forEach(function(k){u[k]=DT.test(S1(u[k]))?u[k]:''});
-  u.rb=defaultUI().rb;u.drawer=null;u.confirmDel=null;u.confirmReset=false;u.confirmSnap=null;u.tpl=null;u.doc=u.doc?S1(u.doc):null;u.ap=u.ap?S1(u.ap):null;
+  ['fpj','ftk','ffp'].forEach(function(k){u[k]=S1(u[k])});
+  u.rb=defaultUI().rb;u.drawer=null;u.confirmDel=null;u.confirmReset=false;u.confirmSnap=null;u.confirmClear=false;u.tpl=null;u.doc=u.doc?S1(u.doc):null;u.ap=u.ap?S1(u.ap):null;
   o.ui=u;return o}
 function load(){try{var r=localStorage.getItem(LS);if(r){var o=normSession(JSON.parse(r));if(o)return o}}catch(e){}return null}
 function hhmm(ts){return new Date(ts).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
@@ -296,7 +298,7 @@ function applyTheme(){var t=S&&S.ui&&S.ui.theme||'light',r=document.documentElem
 var SNAPK='labpm_snaps_v1';
 function getSnaps(){try{var a=JSON.parse(localStorage.getItem(SNAPK));return Array.isArray(a)?a.filter(function(s){return s&&typeof s.id==='string'&&ID.test(s.id)}):[]}catch(e){return []}}
 function putSnaps(a){try{localStorage.setItem(SNAPK,JSON.stringify(a));return true}catch(e){return false}}
-function snapData(){var o=JSON.parse(JSON.stringify(S));o.ui.drawer=null;o.ui.confirmDel=null;o.ui.confirmReset=false;o.ui.confirmSnap=null;return o}
+function snapData(){var o=JSON.parse(JSON.stringify(S));o.ui.drawer=null;o.ui.confirmDel=null;o.ui.confirmReset=false;o.ui.confirmSnap=null;o.ui.confirmClear=false;return o}
 function autoSnap(){var a=getSnaps().filter(function(s){return s.auto!==true});a.unshift({id:uid('s'),name:'Automatic, before replacement',ts:Date.now(),auto:true,data:snapData()});if(a.length>MAXSNAP)a.length=MAXSNAP;putSnaps(a)}
 
 function log(m){S.activity.unshift({t:Date.now(),u:S.me,m:m});if(S.activity.length>300)S.activity.length=300}
@@ -399,17 +401,17 @@ function render(){
   var rt=S.tasks.find(function(t){return t.timer&&t.timer.user===S.me});
   var nav=NAV.map(function(g){return '<div class="ng">'+g[0]+'</div>'+g[1].map(function(n){return '<button class="nv" data-act="nav" data-v="'+n[0]+'"'+(v===n[0]?' aria-current="page"':'')+'>'+n[1]+'</button>'}).join('')}).join('');
   var th=[['light','Light'],['dark','Dark'],['auto','Auto']].map(function(x){return '<button data-act="theme" data-v="'+x[0]+'" aria-pressed="'+(S.ui.theme===x[0])+'">'+x[1]+'</button>'}).join('');
-  $('#app').innerHTML='<div class="app"><nav class="side" aria-label="Sections"><div class="brand">LabPM<small>v1.2 · chemical laboratory</small></div>'+nav+
+  $('#app').innerHTML='<div class="app"><nav class="side" aria-label="Sections"><div class="brand">LabPM<small>v1.3 · chemical laboratory</small></div>'+nav+
     '<div class="sess"><div class="small muted" id="sv">'+esc(savedText())+'</div><button class="btn sm" data-act="nav" data-v="session">Save or open session</button></div></nav>'+
     '<main class="main"><header class="top"><div><h1>'+esc(titles[v])+'</h1><p class="sub">'+esc(DESC[v]||'')+'</p></div><div class="topr">'+
     (rt?'<button class="btn tmr" id="tb" data-act="open" data-id="'+rt.id+'"><span class="rec"></span><span id="tbt">'+elapsed(rt)+'</span></button>':'')+
     '<div class="seg" role="group" aria-label="Theme">'+th+'</div>'+
     '<label class="who">User <select data-ch="me">'+opt(S.users.map(function(u){return [u.id,u.name+' · '+u.role]}),S.me)+'</select></label></div></header>'+
     '<div id="vb">'+body()+'</div>'+
-    '<footer class="foot">© 2026 Flavio Pendolino | <a href="https://polyformproject.org/licenses/noncommercial/1.0.0" target="_blank" rel="noopener">PolyForm Noncommercial 1.0.0</a> · LabPM v1.2 · data stays in this browser until you save the session to a file</footer></main></div>'}
+    '<footer class="foot">© 2026 Flavio Pendolino | <a href="https://polyformproject.org/licenses/noncommercial/1.0.0" target="_blank" rel="noopener">PolyForm Noncommercial 1.0.0</a> · LabPM v1.3 · data stays in this browser until you save the session to a file</footer></main></div>'}
 function renderBody(){var e=$('#vb');if(e)e.innerHTML=body()}
 function commit(){save();renderBody();renderDrawer();var tb=$('#tb');if(!tb&&S.tasks.some(function(t){return t.timer&&t.timer.user===S.me})||tb&&!S.tasks.some(function(t){return t.timer&&t.timer.user===S.me}))render()}
-function body(){switch(S.ui.view){case 'dashboard':return vDash();case 'portfolio':return vPort();case 'tasks':return vTasks();case 'requests':return vReq();case 'docs':return vDocs();case 'automations':return vAuto();case 'templates':return vTpl();case 'session':return vSession();case 'settings':return vSet();default:return vInfo()}}
+function body(){switch(S.ui.view){case 'dashboard':return vDash();case 'portfolio':return vPort();case 'tasks':return vTasks();case 'requests':return vReq();case 'files':return vFiles();case 'docs':return vDocs();case 'automations':return vAuto();case 'templates':return vTpl();case 'session':return vSession();case 'settings':return vSet();default:return vInfo()}}
 
 /* ---------- dashboard ---------- */
 function wKpi(){var op=S.tasks.filter(function(t){return t.status!=='Done'}),ov=op.filter(isOver).length,bl=op.filter(isBlocked).length;
@@ -595,7 +597,7 @@ function vSet(){var ad=isAdmin(),json='';
 
 /* ---------- info and license ---------- */
 function vInfo(){
-  return '<section class="card"><h2>Information</h2><dl class="ib"><dt>Author</dt><dd>Flavio Pendolino</dd><dt>Version</dt><dd>1.2</dd><dt>License</dt><dd>PolyForm Noncommercial 1.0.0</dd><dt>Commercial use</dt><dd>penfla@me.com</dd>'+
+  return '<section class="card"><h2>Information</h2><dl class="ib"><dt>Author</dt><dd>Flavio Pendolino</dd><dt>Version</dt><dd>1.3</dd><dt>License</dt><dd>PolyForm Noncommercial 1.0.0</dd><dt>Commercial use</dt><dd>penfla@me.com</dd>'+
    '<dt>Purpose</dt><dd>Project, task, resource and request management in a chemical/polymer laboratory, with the typical features of Asana and monday.com.</dd>'+
    '<dt>Method</dt><dd>Single-file HTML with vanilla JavaScript; data in browser localStorage; finish-to-start date cascade on working days; workload = remaining hours spread over working days; sessions saved as browser snapshots or JSON files.</dd>'+
    '<dt>Disclaimer</dt><dd>validate the results against your own reference samples before any analytical, engineering, safety or regulatory use.</dd>'+
@@ -616,7 +618,7 @@ function vSession(){
    '<section class="card"><h2>Save the session</h2><div class="form"><label class="full">Name<input id="ss-name" placeholder="E.g. Campaign 03, end of week" maxlength="80"></label>'+
    '<label class="full"><span class="row" style="flex-wrap:wrap"><button class="btn pri" data-act="snapsave">Save in browser</button><button class="btn" data-act="savefile">Save to file (.json)</button></span></label></div>'+
    '<p class="small muted" style="margin:10px 0 0">The session includes projects, tasks, hours, documents, rules, fields, people and settings. Up to '+MAXSNAP+' sessions in the browser; the file is for moving your work to another computer.</p></section></div>'+
-   vFolder()+
+   vFolder()+vEmpty()+
    '<section class="card"><h2>Sessions saved in the browser</h2>'+(rows?'<div class="tbw"><table class="tbl" style="min-width:600px"><thead><tr><th>Name</th><th>Saved</th><th>Content</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="muted">No saved sessions. Use "Save in browser" to create one.</p>')+
    '<p class="small muted" style="margin:10px 0 0">Restoring replaces the current data (Admin only) and first creates an automatic copy. Running timers are not restored.</p></section>'+
    '<section class="card"><h2>Open from file</h2><div class="form"><label class="full">Session file (.json)<input type="file" id="sf" accept=".json,application/json" data-ch="openfile"'+(ad?'':' disabled')+'></label></div>'+
@@ -656,6 +658,7 @@ function renderDrawer(){
    (ro?'':'<div class="row"><input type="number" id="lg-h" min="0" step="0.25" placeholder="hours" style="width:80px"><input id="lg-n" placeholder="note" class="grow"><button class="btn sm" data-act="addlog" data-id="'+t.id+'">Add</button></div>')+
    '<div class="lst small">'+t.log.slice(-8).reverse().map(function(l){return '<div><span><span class="mono">'+fd(l.date)+'</span> · '+esc(uname(l.u))+' · <b class="mono">'+nf(l.h,2)+' h</b> '+esc(l.note||'')+'</span>'+(ro?'':'<button class="btn sm" data-act="dellog" data-id="'+t.id+'" data-lid="'+l.id+'">×</button>')+'</div>'}).join('')+'</div></div>'+
    '<div class="sec"><h3>Notes</h3><textarea rows="3" data-ch="dr" data-f="notes"'+dis+'>'+esc(t.notes)+'</textarea></div>'+
+   attSec(t,ro)+
    '<div class="sec"><h3>Documents</h3>'+(docs.map(function(d){return '<div><a href="#" data-act="docsel" data-id="'+d.id+'" data-go="1">'+esc(d.title)+'</a></div>'}).join('')||'<span class="muted small">No linked documents.</span>')+(isPM()||role()==='Researcher'?'<button class="btn sm" data-act="docnew" data-task="'+t.id+'" style="width:max-content">New document for this task</button>':'')+'</div>'+
    (isPM()?'<div class="sec"><button class="btn dng" data-act="'+(S.ui.confirmDel===t.id?'deltask2':'deltask')+'" data-id="'+t.id+'" style="width:max-content">'+(S.ui.confirmDel===t.id?'Confirm deletion':'Delete task')+'</button></div>':'')+
    '</div></div>';
@@ -687,12 +690,12 @@ function xSheet(rows,widths,filter){var out='<?xml version="1.0" encoding="UTF-8
   rows.forEach(function(r,ri){out+='<row r="'+(ri+1)+'">'+r.map(function(c,i){return xCell(c,ri+1,i,filter&&ri===0)}).join('')+'</row>'});
   out+='</sheetData>'+(filter&&rows.length?'<autoFilter ref="A1:'+colN(rows[0].length-1)+rows.length+'"/>':'')+'</worksheet>';return out}
 function buildXlsx(tasks,info){
-  var cfs=S.fields,hd=['Title','Project','Status','Assignee','Priority','Start','Due','Estimated h','Logged h','Overdue','Blocked','Depends on','Tags'].concat(cfs.map(function(f){return f.name}),['Requester','Notes']);
+  var cfs=S.fields,hd=['Title','Project','Status','Assignee','Priority','Start','Due','Estimated h','Logged h','Overdue','Blocked','Depends on','Tags'].concat(cfs.map(function(f){return f.name}),['Requester','Notes','Attachments']);
   var rows=[hd];
   tasks.forEach(function(t){var p=P(t.projectId);
     var cv=cfs.map(function(f){if(f.type==='formula'){var r=calc(t,f);return r==null?null:{n:r}}var v=t.cf[f.id];if(v==null||v==='')return null;if(f.type==='number')return isFinite(parseFloat(v))?{n:parseFloat(v)}:String(v);if(f.type==='date')return DT.test(String(v))?{d:v}:String(v);if(f.type==='checkbox')return v?'Yes':'No';return String(v)});
-    rows.push([t.title,p?p.name:'',t.status,t.assignee?uname(t.assignee):'',t.priority,{d:t.start},{d:t.due},{n:t.est},{n:Math.round(logged(t)*100)/100},isOver(t)?'Yes':'No',isBlocked(t)&&t.status!=='Done'?'Yes':'No',t.deps.map(function(d){var x=T(d);return x?x.title:''}).filter(Boolean).join('; '),t.tags.join(', ')].concat(cv,[t.requester||'',t.notes||'']))});
-  var w=[38,30,13,14,10,12,12,12,10,9,9,34,18].concat(cfs.map(function(){return 16}),[16,40]);
+    rows.push([t.title,p?p.name:'',t.status,t.assignee?uname(t.assignee):'',t.priority,{d:t.start},{d:t.due},{n:t.est},{n:Math.round(logged(t)*100)/100},isOver(t)?'Yes':'No',isBlocked(t)&&t.status!=='Done'?'Yes':'No',t.deps.map(function(d){var x=T(d);return x?x.title:''}).filter(Boolean).join('; '),t.tags.join(', ')].concat(cv,[t.requester||'',t.notes||'',S.files.filter(function(f){return f.taskId===t.id}).map(function(f){return f.name}).join('; ')]))});
+  var w=[38,30,13,14,10,12,12,12,10,9,9,34,18].concat(cfs.map(function(){return 16}),[16,40,36]);
   var ws1=xSheet(rows,w,true),ws2=xSheet(info,[26,60],false),X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
   var ns='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
   return zipStore([
@@ -711,7 +714,7 @@ function dl(blob,fn){var url=URL.createObjectURL(blob),a=document.createElement(
 function exportTasks(){var ts=filtered().slice().sort(function(a,b){var pa=S.projects.indexOf(P(a.projectId)),pb=S.projects.indexOf(P(b.projectId));return pa!==pb?pa-pb:(a.start<b.start?-1:a.start>b.start?1:0)}),u=S.ui;
   if(!ts.length){toast('No tasks match the filters: nothing to export.');return}
   var pn=u.fp?(P(u.fp)||{}).name:'All',an=u.fa==='_'?'Unassigned':u.fa?uname(u.fa):'Everyone';
-  var info=[['Application','LabPM v1.2'],['Exported at',new Date().toLocaleString('en-GB')],['Exported by',me().name+' ('+me().role+')'],['Rows',{n:ts.length}],['',''],['Filter','Value'],['Search',u.q||'(none)'],['Project',pn],['Assignee',an],['Status',u.fs||'All'],['Priority',u.fpr||'All'],['Due from',u.fdf||'(none)'],['Due to',u.fdt||'(none)']];
+  var info=[['Application','LabPM v1.3'],['Exported at',new Date().toLocaleString('en-GB')],['Exported by',me().name+' ('+me().role+')'],['Rows',{n:ts.length}],['',''],['Filter','Value'],['Search',u.q||'(none)'],['Project',pn],['Assignee',an],['Status',u.fs||'All'],['Priority',u.fpr||'All'],['Due from',u.fdf||'(none)'],['Due to',u.fdt||'(none)']];
   var fn='labpm-tasks-'+TODAY()+'.xlsx';
   saveBlob(buildXlsx(ts,info),fn,'Excel workbook','.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').then(function(ok){if(ok){log('Exported '+ts.length+' tasks to Excel');save();toast('Exported '+ts.length+' tasks to '+fn)}})}
 
@@ -743,9 +746,55 @@ function vFolder(){var h='<section class="card"><h2>Backup folder (autosave ever
   else{st='Not connected. Choose a folder <b>before you start entering data</b>: an initial copy of the current database is written there, then every change is saved automatically.';btn='<button class="btn pri" data-act="foldersel">Choose folder…</button>'}
   return h+'<p style="margin:0 0 10px">'+st+'</p><div class="tools">'+btn+'</div><p class="small muted" style="margin:10px 0 0">Files: <span class="mono">labpm-initial-&lt;date&gt;.json</span> (copy at connection), <span class="mono">labpm-autosave.json</span> (always the latest state), <span class="mono">labpm-copy-&lt;date&gt;.json</span> (manual copies). They are plain, unencrypted JSON: choose a folder with appropriate access control. Reopen any of them with <i>Open from file</i>. The browser asks permission again after a restart.</p></section>'}
 
+
+/* ---------- attachments (copied into <backup folder>/attachments/...) ---------- */
+var fsz=function(n){return n<1024?n+' B':n<1048576?nf(n/1024,1)+' KB':nf(n/1048576,1)+' MB'};
+var safeName=function(n){n=String(n||'file').replace(/[\\/:*?"<>|\u0000-\u001f]/g,'_').replace(/^[.\s]+|[.\s]+$/g,'');return (n||'file').slice(0,120)};
+var slug=function(n){return String(n||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40)||'x'};
+function attDir(taskId,projectId){var t=taskId&&T(taskId),p=P(projectId||(t&&t.projectId));
+  return t?'task-'+slug(t.title)+'-'+t.id:'project-'+slug(p&&p.name)+'-'+(p?p.id:'none')}
+var canAttach=function(taskId){var t=taskId&&T(taskId);return t?canEdit(t):isPM()};
+function attPerm(){if(!FS.h)return Promise.reject(new Error(FS.pending?'Reconnect the backup folder first (Session page).':'Connect a backup folder first (Session page): attachments are stored next to the database.'));
+  return FS.h.queryPermission({mode:'readwrite'}).then(function(p){return p==='granted'?p:FS.h.requestPermission({mode:'readwrite'})}).then(function(p){if(p!=='granted')throw new Error('Folder permission not granted.')})}
+async function attachFiles(list,taskId,projectId){
+  if(!list.length)return;
+  if(!canAttach(taskId)){toast('Your role cannot attach files here.');return}
+  var t=taskId&&T(taskId),pid=projectId||(t&&t.projectId)||'';
+  if(!t&&!P(pid)){toast('Choose a project first.');return}
+  try{await attPerm();
+    var root=await FS.h.getDirectoryHandle('attachments',{create:true}),dn=attDir(taskId,pid),sub=await root.getDirectoryHandle(dn,{create:true}),n=0;
+    for(var i=0;i<list.length;i++){var f=list[i],base=safeName(f.name),nm=base,k=1;
+      for(;;){try{await sub.getFileHandle(nm);k++;var dot=base.lastIndexOf('.');nm=dot>0?base.slice(0,dot)+' ('+k+')'+base.slice(dot):base+' ('+k+')'}catch(e){if(e&&e.name==='NotFoundError')break;throw e}}
+      var fh=await sub.getFileHandle(nm,{create:true}),w=await fh.createWritable();await w.write(f);await w.close();
+      S.files.push({id:uid('a'),taskId:taskId||'',projectId:pid,name:nm,path:'attachments/'+dn+'/'+nm,size:f.size,type:f.type||'',added:Date.now(),by:S.me});n++;
+      log('Attached "'+nm+'"'+(t?' to "'+t.title+'"':' to project "'+(P(pid)||{}).name+'"'))}
+    toast(n+' file(s) copied to "'+FS.h.name+'/attachments/'+dn+'".');commit()}
+  catch(er){toast('Attachment failed: '+((er&&er.message)||er));commit()}}
+async function fileGet(rec){var parts=String(rec.path).split('/');
+  if(!FS.h)throw new Error(FS.pending?'Reconnect the backup folder first (Session page).':'Backup folder not connected.');
+  if(parts.length<3||parts[0]!=='attachments'||parts.some(function(x){return !x||x==='.'||x==='..'}))throw new Error('Invalid attachment path.');
+  await attPerm();var d=FS.h;for(var i=0;i<parts.length-1;i++)d=await d.getDirectoryHandle(parts[i]);
+  return (await d.getFileHandle(parts[parts.length-1])).getFile()}
+function fileRows(list,ro,ctx){return list.map(function(f){var t=f.taskId&&T(f.taskId),p=P(f.projectId);
+  return '<div><span class="grow" style="flex:1;min-width:0"><b>'+esc(f.name)+'</b> <span class="muted small mono">'+fsz(f.size)+' · '+fd(new Date(f.added).toISOString().slice(0,10))+' · '+esc(uname(f.by))+'</span>'+(ctx?'<br><span class="small muted">'+pdot(p)+esc(p?p.name:'—')+(t?' › '+esc(t.title):' › (project)')+'</span>':'')+'<br><span class="small muted mono">'+esc(f.path)+'</span></span><span class="row"><button class="btn sm" data-act="fopen" data-id="'+f.id+'">Open</button><button class="btn sm" data-act="fsave" data-id="'+f.id+'">Save copy</button>'+(canAttach(f.taskId)?'<button class="btn sm dng" data-act="frm" data-id="'+f.id+'" title="Removes the link only; the file stays in the folder">Remove</button>':'')+'</span></div>'}).join('')}
+function attSec(t,ro){var fl=S.files.filter(function(f){return f.taskId===t.id});
+  return '<div class="sec"><h3>Attachments</h3>'+(fl.length?'<div class="lst">'+fileRows(fl,ro,false)+'</div>':'<span class="muted small">No attachments.</span>')+
+   (ro?'':(FS.h?'<label class="small muted" style="display:flex;flex-direction:column;gap:3px">Add files (copied to <span class="mono">'+esc(FS.h.name)+'/attachments/</span>)<input type="file" multiple data-ch="attach" data-task="'+t.id+'"></label>':'<span class="small muted">Connect a backup folder on the Session page to enable attachments: files are copied next to the database.</span>'))+'</div>'}
+function vFiles(){var u=S.ui,pid=u.fpj&&P(u.fpj)?u.fpj:(S.projects[0]?S.projects[0].id:''),tk=u.ftk&&T(u.ftk)&&T(u.ftk).projectId===pid?u.ftk:'',can=canAttach(tk)&&!!pid;
+  var list=S.files.filter(function(f){return !u.ffp||f.projectId===u.ffp}).sort(function(a,b){return b.added-a.added});
+  var head='<section class="card"><h2>Add files</h2>';
+  if(!FS.h)head+='<p style="margin:0 0 10px">'+(FS.pending?'The backup folder <b>'+esc(FS.pending.name)+'</b> needs your permission again.':'No backup folder connected.')+' Attachments are copied into an <span class="mono">attachments</span> subfolder of the folder that holds the database, so a folder must be connected first.</p><button class="btn pri" data-act="nav" data-v="session">Go to Session → Backup folder</button></section>';
+  else head+='<div class="form"><label>Project<select data-ch="fpj">'+opt(pOpts(),pid)+'</select></label><label>Task<select data-ch="ftk">'+opt([['','— project-level file —']].concat(S.tasks.filter(function(t){return t.projectId===pid}).map(function(t){return [t.id,t.title]})),tk)+'</select></label><label class="full">Files<input type="file" multiple data-ch="attach" data-task="'+esc(tk)+'" data-proj="'+esc(pid)+'"'+(can?'':' disabled')+'></label></div><p class="small muted" style="margin:10px 0 0">'+(can?'':'Your role cannot attach files here. ')+'Destination: <span class="mono">'+esc(FS.h.name)+'/attachments/'+esc(pid?attDir(tk,pid):'…')+'/</span>. Files are copied (not moved); existing names get a numeric suffix. Removing an attachment only removes the link: the file stays in the folder.</p></section>';
+  return head+'<section class="card"><h2>All attachments</h2><div class="tools" style="margin-bottom:10px"><select data-ch="ffp" aria-label="Project">'+opt([['','All projects']].concat(pOpts()),u.ffp)+'</select><span class="small muted">'+list.length+' file(s)</span></div>'+(list.length?'<div class="lst">'+fileRows(list,false,true)+'</div>':'<p class="muted" style="margin:0">No attachments yet.</p>')+'</section>'}
+/* ---------- empty database / clear ---------- */
+function emptySession(){var f=function(id,name,type,x){var o={id:id,name:name,type:type};if(type==='select')o.options=x;if(type==='formula')o.formula=x;return o};
+  return {v:1,me:'u1',users:[{id:'u1',name:'Admin',role:'Admin',cap:40}],projects:[],tasks:[],fields:[f('f1','Instrument','select',TOOLS.slice()),f('f2','No. of samples','number'),f('f3','Lot','text'),f('f4','Hours per sample','formula','{est}/{No. of samples}')],rules:[],goals:[],docs:[],files:[],activity:[],ui:defaultUI(),demo:false}}
+function vEmpty(){var ad=isAdmin(),c=S.ui.confirmClear;
+  return '<section class="card"><h2>Empty database</h2><div class="tools"><button class="btn" data-act="emptyfile">Download empty database file</button><button class="btn dng" data-act="clearall"'+(ad?'':' disabled')+'>'+(c?'Confirm: delete ALL projects, tasks, documents, rules':'Clear all project data')+'</button>'+(c?'<button class="btn" data-act="clearcancel">Cancel</button>':'')+'</div><p class="small muted" style="margin:10px 0 0">The empty file (<span class="mono">labpm-empty.json</span>) has no projects or tasks, one Admin user and the default custom fields; open it with <i>Open from file</i> (Admin). <b>Clear all project data</b> (Admin) deletes projects, tasks, hours, goals, documents, rules, attachment links and the activity log, and keeps people, roles and custom fields. Before clearing, an automatic browser snapshot is taken and, if a backup folder is connected, a copy is written there. Files already copied to the <span class="mono">attachments</span> folder are never deleted.</p></section>'}
+
 /* ---------- actions ---------- */
 function defVal(type){return {status_to:'Done',set_status:'In progress',priority:'High',set_priority:'High',project:S.projects[0]?S.projects[0].id:'',set_assignee:''}[type]||''}
-function go(view){S.ui.view=view;S.ui.drawer=null;save();render();renderDrawer();window.scrollTo(0,0)}
+function go(view){S.ui.view=view;S.ui.drawer=null;S.ui.confirmClear=false;save();render();renderDrawer();window.scrollTo(0,0)}
 function download(txt,label){var done=function(){toast(label+' copied to clipboard')};
   var fb=function(){var a=$('#jb');if(a){a.value=txt;a.focus();a.select()}toast('Clipboard unavailable: text placed in the field, copy it from there')};
   try{navigator.clipboard.writeText(txt).then(done,fb)}catch(e){fb()}}
@@ -770,11 +819,19 @@ var A={
  foldernow:function(){folderNow(true).then(function(){if(!FS.err)toast('Copy saved in "'+FS.h.name+'".')})},
  foldertoggle:function(){FS.on=!FS.on;FS.err='';try{localStorage.setItem('labpm_fs_on',FS.on?'1':'0')}catch(e){}if(FS.on)folderNow(false);renderBody();var el=document.getElementById('sv');if(el)el.textContent=savedText()},
  foldernone:function(){FS.h=null;FS.pending=null;FS.on=false;FS.err='';idbDo('readwrite',function(st){return st.delete('dir')}).catch(function(){});renderBody();var el=document.getElementById('sv');if(el)el.textContent=savedText()},
+ emptyfile:function(){var blob=new Blob([JSON.stringify(emptySession(),null,1)],{type:'application/json'});saveBlob(blob,'labpm-empty.json','LabPM database','.json','application/json').then(function(ok){if(ok)toast('Empty database file saved.')})},
+ clearall:function(){if(!isAdmin())return;if(!S.ui.confirmClear){S.ui.confirmClear=true;renderBody();return}
+  autoSnap();var wipe=function(){S.projects=[];S.tasks=[];S.goals=[];S.docs=[];S.rules=[];S.files=[];S.activity=[];S.demo=false;var u=S.ui;u.drawer=null;u.confirmClear=false;u.q='';u.fp='';u.fa='';u.fs='';u.fpr='';u.fdf='';u.fdt='';u.fpj='';u.ftk='';u.ffp='';u.doc=null;u.ap=null;u.tpl=null;log('All project data cleared');save();render();renderDrawer();toast('All project data cleared (snapshot saved in Session).')};
+  (FS.h&&FS.on?folderNow(true):Promise.resolve()).then(wipe)},
+ clearcancel:function(){S.ui.confirmClear=false;renderBody()},
+ fopen:function(e){var f=S.files.find(function(x){return x.id===e.dataset.id});if(!f)return;fileGet(f).then(function(file){var url=URL.createObjectURL(file);if(!window.open(url,'_blank','noopener'))dl(file,f.name);setTimeout(function(){URL.revokeObjectURL(url)},60000)},function(er){toast((er&&er.name==='NotFoundError')?'File not found in the folder (moved or deleted?).':((er&&er.message)||'Cannot open file.'))})},
+ fsave:function(e){var f=S.files.find(function(x){return x.id===e.dataset.id});if(!f)return;fileGet(f).then(function(file){dl(file,f.name)},function(er){toast((er&&er.name==='NotFoundError')?'File not found in the folder (moved or deleted?).':((er&&er.message)||'Cannot read file.'))})},
+ frm:function(e){var f=S.files.find(function(x){return x.id===e.dataset.id});if(!f||!canAttach(f.taskId))return;S.files=S.files.filter(function(x){return x.id!==f.id});log('Attachment link removed: '+f.name);toast('Link removed; "'+f.name+'" stays in the folder.');commit()},
  tview:function(e){S.ui.tview=e.dataset.v;save();renderBody()},
  open:function(e){S.ui.drawer=e.dataset.id;S.ui.confirmDel=null;renderDrawer()},
  close:function(){S.ui.drawer=null;S.ui.confirmDel=null;renderDrawer()},
  closeov:function(e,ev){if(ev.target===e)A.close()},
- newtask:function(){var n=newTask({projectId:S.ui.fp||(S.projects[0]&&S.projects[0].id),assignee:S.ui.fa&&S.ui.fa!=='_'?S.ui.fa:null});log('Created "'+n.title+'"');fire({type:'created'},n,0);S.ui.drawer=n.id;commit()},
+ newtask:function(){if(!S.projects.length){toast('Create a project first (Portfolio or Templates).');return}var n=newTask({projectId:S.ui.fp||(S.projects[0]&&S.projects[0].id),assignee:S.ui.fa&&S.ui.fa!=='_'?S.ui.fa:null});log('Created "'+n.title+'"');fire({type:'created'},n,0);S.ui.drawer=n.id;commit()},
  calprev:function(){var a=S.ui.cal.split('-').map(Number),d=new Date(a[0],a[1]-2,1);S.ui.cal=d.getFullYear()+'-'+pad(d.getMonth()+1);save();$('#tv').innerHTML=tv()},
  calnext:function(){var a=S.ui.cal.split('-').map(Number),d=new Date(a[0],a[1],1);S.ui.cal=d.getFullYear()+'-'+pad(d.getMonth()+1);save();$('#tv').innerHTML=tv()},
  caltoday:function(){S.ui.cal=TODAY().slice(0,7);save();$('#tv').innerHTML=tv()},
@@ -783,7 +840,7 @@ var A={
  addlog:function(e){var t=T(e.dataset.id),h=parseFloat($('#lg-h').value);if(!t||!canEdit(t))return;if(!(h>0)){toast('Enter hours (greater than zero).');return}t.log.push({id:uid('l'),u:S.me,date:TODAY(),h:h,note:$('#lg-n').value.trim()});log('Hours on "'+t.title+'": '+nf(h,2));commit()},
  dellog:function(e){var t=T(e.dataset.id);if(!t||!canEdit(t))return;t.log=t.log.filter(function(l){return l.id!==e.dataset.lid});commit()},
  deltask:function(e){S.ui.confirmDel=e.dataset.id;renderDrawer()},
- deltask2:function(e){var id=e.dataset.id,t=T(id);if(!t||!isPM())return;S.tasks=S.tasks.filter(function(x){return x.id!==id});S.tasks.forEach(function(x){x.deps=x.deps.filter(function(d){return d!==id})});log('Deleted "'+t.title+'"');S.ui.drawer=null;S.ui.confirmDel=null;commit()},
+ deltask2:function(e){var id=e.dataset.id,t=T(id);if(!t||!isPM())return;S.tasks=S.tasks.filter(function(x){return x.id!==id});S.tasks.forEach(function(x){x.deps=x.deps.filter(function(d){return d!==id})});var nf2=S.files.filter(function(f){return f.taskId===id}).length;S.files=S.files.filter(function(f){return f.taskId!==id});log('Deleted "'+t.title+'"');if(nf2)toast(nf2+' attachment link(s) removed; the files stay in the attachments folder.');S.ui.drawer=null;S.ui.confirmDel=null;commit()},
  docsel:function(e,ev){if(ev)ev.preventDefault();S.ui.doc=e.dataset.id;if(e.dataset.go){S.ui.view='docs';S.ui.drawer=null;save();render();renderDrawer()}else{save();renderBody()}},
  docnew:function(e){var d={id:uid('d'),title:'New document',projectId:'',taskId:e.dataset.task||'',updated:Date.now(),body:'# Title\n\n'};if(d.taskId){var t=T(d.taskId);d.projectId=t.projectId;d.title='Notes: '+t.title}S.docs.push(d);S.ui.doc=d.id;S.ui.view='docs';S.ui.drawer=null;log('Nuovo documento "'+d.title+'"');save();render();renderDrawer()},
  docdel:function(e){S.docs=S.docs.filter(function(d){return d.id!==e.dataset.id});S.ui.doc=null;save();renderBody()},
@@ -809,7 +866,7 @@ var A={
   tp.tasks.forEach(function(x){var s=normWD(start);(x.after||[]).forEach(function(k){var pr=T(ids[k]);if(pr){var c=nextWD(pr.due);if(c>s)s=c}});
    var cf={};if(x.tool&&tf)cf[tf.id]=x.tool;var t=newTask({projectId:p.id,title:x.t,status:'To do',start:s,due:addWD(s,Math.max(x.d-1,0)),est:x.est,deps:(x.after||[]).map(function(k){return ids[k]}),cf:cf});ids.push(t.id);fire({type:'created'},t,0)});
   log('Project from template "'+tp.name+'"');S.ui.tpl=null;S.ui.fp=p.id;S.ui.tview='timeline';toast('Project created with '+tp.tasks.length+' tasks.');S.ui.view='tasks';save();render()},
- bulk:function(){var pid=$('#bk-p').value,lines=$('#bk-t').value.split('\n').map(function(l){return l.trim()}).filter(Boolean);if(!lines.length){toast('Write at least one line.');return}
+ bulk:function(){var pid=$('#bk-p').value;if(!pid){toast('Create a project first.');return}var lines=$('#bk-t').value.split('\n').map(function(l){return l.trim()}).filter(Boolean);if(!lines.length){toast('Write at least one line.');return}
   lines.forEach(function(l){var as=/@(\S+)/.exec(l),d=/#(\d+)/.exec(l),h=/~(\d+(?:[.,]\d+)?)h/.exec(l),u=as&&S.users.find(function(x){return x.name.toLowerCase().indexOf(as[1].toLowerCase())>=0});
    var s=normWD(TODAY()),t=newTask({projectId:pid,title:l.replace(/[@#~]\S+/g,'').replace(/\s+/g,' ').trim()||l,assignee:u?u.id:null,start:s,due:addWD(s,Math.max((d?parseInt(d[1],10):2)-1,0)),est:h?parseFloat(h[1].replace(',','.')):0});fire({type:'created'},t,0)});
   log('Created '+lines.length+' tasks from list');toast(lines.length+' tasks created.');S.ui.fp=pid;S.ui.tview='list';S.ui.view='tasks';save();render()},
@@ -833,6 +890,8 @@ var H={
  me:function(e){S.me=e.value;S.ui.drawer=null;save();render();renderDrawer()},
  fp:function(e){S.ui.fp=e.value;save();renderBody()},fa:function(e){S.ui.fa=e.value;save();renderBody()},fs:function(e){S.ui.fs=e.value;save();renderBody()},
  group:function(e){S.ui.group=e.value;save();renderBody()},
+ fpj:function(e){S.ui.fpj=e.value;S.ui.ftk='';save();renderBody()},ftk:function(e){S.ui.ftk=e.value;save();renderBody()},ffp:function(e){S.ui.ffp=e.value;save();renderBody()},
+ attach:function(e){var l=Array.prototype.slice.call(e.files||[]),t=e.dataset.task||'',pj=e.dataset.proj||'';e.value='';attachFiles(l,t,pj)},
  fpr:function(e){S.ui.fpr=e.value;save();renderBody()},fdf:function(e){S.ui.fdf=e.value;save();renderBody()},fdt:function(e){S.ui.fdt=e.value;save();renderBody()},
  widget:function(e){S.ui.widgets[e.dataset.k]=e.checked?1:0;save();renderBody()},
  ap:function(e){S.ui.ap=e.value;renderBody()},

@@ -1,6 +1,6 @@
 # Architecture
 
-Source of truth: [`index.html`](../index.html) (~120 kB, one IIFE, `'use strict'`).
+Source of truth: [`index.html`](../index.html) (~135 kB, one IIFE, `'use strict'`).
 
 ## 1. Layout of the file
 
@@ -46,6 +46,12 @@ No library. The workbook is generated as OOXML strings (`[Content_Types].xml`, `
 
 ### Backup folder (File System Access API)
 `showDirectoryPicker({mode:'readwrite'})` → handle stored in IndexedDB (`labpm_fs`/`h`/`dir`; structured-cloneable) so it survives reloads; permission is re-requested via `requestPermission` from a click (`Reconnect folder`). `save()` → `folderSchedule()` (800 ms debounce) → `folderNow()` appends to a promise queue `FS.q` that writes `labpm-autosave.json` via `createWritable()` (atomic replace on close). Connection writes `labpm-initial-<stamp>.json` first. Errors set `FS.err`, pause the feature and surface in the UI. Free-text fields additionally save on the `input` event (state only, no re-render, so caret/focus are preserved).
+
+### Attachments
+`attachFiles()` → `attPerm()` (query/request readwrite permission on the stored folder handle) → `getDirectoryHandle('attachments',{create})` → per-owner subfolder (`task-<slug(title)>-<id>` / `project-<slug(name)>-<id>`) → unique name check via `getFileHandle(name)` (NotFoundError = free) → `createWritable().write(File)`; record `{id,taskId,projectId,name,path,size,type,added,by}` pushed to `S.files`. The path is relative to the folder and stored in the database, so the folder is relocatable. `fileGet()` re-validates the path (must start with `attachments/`, no empty/`.`/`..` segments) before walking the directory handles, so a tampered session file cannot escape the folder. Files are never deleted by the app.
+
+### Empty database
+`emptySession()` builds the minimal valid session (also published as `empty-database/labpm-empty.json`). *Clear all project data* resets collections in place (users/fields/ui theme kept) after `autoSnap()` and, if connected, `folderNow(true)`.
 
 ## 4. Security model
 

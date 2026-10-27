@@ -2,6 +2,17 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [SemVer](https://semver.org).
 
+## [1.3.0] — 2026-10-27
+
+### Added
+- **Attachments**: *Files* page (side menu) and *Attachments* section in each task. Files are copied to `<backup folder>/attachments/…` next to the database; links stored in the session (`files`). Open, save copy, remove link; name-collision suffix; Excel export lists attachment names.
+- **Empty database**: *Download empty database file* and `empty-database/labpm-empty.json`.
+- **Clear all project data** button (Admin, two-step) with automatic snapshot and folder copy beforehand.
+- Empty-database safeguards (tasks require a project).
+
+### Changed
+- Session schema: optional `files` array (backward compatible).
+
 ## [1.2.0] — 2026-10-27
 
 ### Added

@@ -1,10 +1,10 @@
 # User guide
 
-Applies to LabPM 1.2.0. Live demo / source: https://github.com/penfla/labpm
+Applies to LabPM 1.3.0. Live demo / source: https://github.com/penfla/labpm
 
 ## 1. Navigation
 
-Left rail: **Work** (Dashboard, Tasks, Requests) · **Planning** (Portfolio, Templates, Automations, Documents) · **System** (Session, Settings, Info & license). On screens ≤ 860 px the rail becomes a horizontal scroll bar.
+Left rail: **Work** (Dashboard, Tasks, Files, Requests) · **Planning** (Portfolio, Templates, Automations, Documents) · **System** (Session, Settings, Info & license). On screens ≤ 860 px the rail becomes a horizontal scroll bar.
 
 Top bar: running-timer button (opens the task), theme (Light / Dark / Auto), **User** switcher (demo of roles; see §10).
 
@@ -49,8 +49,20 @@ Title, project, status, assignee (PM/Admin only), priority, start, due, estimate
 
 - **Dependencies (finish-to-start).** Tick predecessors. Circular links are prevented (candidates exclude tasks that already depend on the current one).
 - **Cascade.** Changing a due date or adding a predecessor moves every non-Done successor whose start ≤ predecessor due: new start = next working day after the predecessor due, duration (in working days) preserved, recursively. A toast reports how many tasks moved.
+- **Attachments.** Add one or more files from the drawer (needs a connected backup folder, see §11). Each file is copied to `<folder>/attachments/task-<title>-<id>/`; *Open* shows it in a new tab (falls back to download), *Save copy* downloads it, *Remove* drops the link only. Researchers can attach to their own tasks; PM/Admin to any; Viewer cannot.
 - **Time.** *Start timer* (stops any other timer you have running); stopping logs hours (≥ 0.01 h, rounded to 0.01) with note "Timer". Manual entry: hours + note → today. Last 8 entries shown.
 - **Overdue flag.** Computed live; also fires *overdue* automations once per task (re-armed when dates change).
+
+## 3b. Files
+
+Side-menu page for attachments across projects.
+
+1. Connect a backup folder first (*Session → Backup folder*). Without it the page only explains this: attachments are stored **inside the folder that holds the database**.
+2. Choose *Project*; optionally a *Task* (otherwise the file is project-level) and pick files (multiple). The destination path is shown: `<folder>/attachments/task-<slug>-<taskId>/` or `<folder>/attachments/project-<slug>-<projectId>/`.
+3. Files are copied, never moved. If the name already exists in that subfolder a suffix is added (`name (2).ext`); characters illegal in file names become `_`.
+4. *All attachments* lists everything (filter by project) with size, date, user and relative path. The *Attachments* column of the Excel export lists the file names per task.
+
+The relative path is stored in the database, so moving the whole folder (database + `attachments/`) to another computer keeps the links valid after you reconnect it. Deleting a task removes its links (a toast says so); files stay on disk. After a restart the browser asks permission again (*Reconnect folder*). Not supported without the File System Access API (Chromium).
 
 ## 4. Requests (intake)
 
@@ -163,6 +175,12 @@ Roles are a UI convention (see [SECURITY.md](../SECURITY.md)).
 | Restore snapshot / open file | Session | Admin; two-step confirm; automatic snapshot first; ≤ 5 MB |
 | Copy / paste JSON | Session, Settings | Clipboard fallback writes into the text field |
 
+### Empty database and clearing
+
+- **Download empty database file** (*Session → Empty database*) saves `labpm-empty.json`: no projects/tasks, one Admin user, the four default custom fields. A ready-made copy is in the repository at `empty-database/labpm-empty.json`. Load with *Open from file* (Admin).
+- **Clear all project data** (Admin; two clicks): deletes projects, tasks, hours, goals, documents, rules, attachment links and the activity log; keeps users, roles and custom fields. First an automatic browser snapshot (restorable under *Sessions saved in the browser*) and, if a folder is connected, a `labpm-copy-<date>.json` are written. Attachment files in the folder are not deleted.
+- With an empty database, create a project in *Portfolio* (or from *Templates*) before adding tasks.
+
 ### Backup folder (recommended before you start entering data)
 
 *Session → Backup folder → Choose folder…* (Chromium browsers: Chrome, Edge).
@@ -175,7 +193,7 @@ Roles are a UI convention (see [SECURITY.md](../SECURITY.md)).
 
 If a write fails (folder removed, disk full, permission revoked) autosave stops, a message is shown and the Session page reports the error; fix the cause and *Resume*. Restore from any of the files with *Open from file* (Admin).
 
-Files are plain unencrypted JSON. Not supported in Firefox/Safari (use *Save to file*).
+Files (database and attachments) are unencrypted. Not supported in Firefox/Safari (use *Save to file*; attachments unavailable).
 
 ## 12. Keyboard and accessibility
 

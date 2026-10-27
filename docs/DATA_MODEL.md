@@ -8,6 +8,7 @@ Session object (`localStorage['labpm_v1']`, snapshot entries in `labpm_snaps_v1`
 |---|---|---|
 | `v` | `1` | Required; other values rejected |
 | `me` | id | Current user; falls back to first user |
+| `files` | attachment records | Optional (older sessions: `[]`); ≤ 5000 |
 | `users` `projects` `tasks` `fields` `rules` `goals` `docs` | arrays | ≤ 5000 items each; every item needs `id` matching `^[A-Za-z0-9_-]{1,40}$` |
 | `activity` | `{t:number,u:id,m:string}[]` | ≤ 300 (newest first) |
 | `ui` | object | View, filters, theme, widgets… (drawer and confirmation flags reset on load) |
@@ -51,6 +52,9 @@ Session object (`localStorage['labpm_v1']`, snapshot entries in `labpm_snaps_v1`
   "action":{"type":"create_task","value":"Archive residual samples"} }
 ```
 `trigger.type ∈ status_to | created | overdue`; `cond.type ∈ none | project | priority | tag`; `action.type ∈ notify | set_assignee | set_priority | set_status | add_tag | create_task`. Rules with unknown types are dropped.
+
+### file (attachment record)
+`{id, taskId, projectId, name, path, size, type, added, by}` — `path` is relative to the backup folder (`attachments/<owner-folder>/<name>`); `taskId` empty = project-level; `added` epoch ms; `by` user id. The binary lives only in the folder, never in the JSON.
 
 ### goal
 `{id, name, target:"YYYY-MM-DD", pids:id[]}`
