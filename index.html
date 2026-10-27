@@ -4,11 +4,11 @@ Copyright (c) 2026 Flavio Pendolino
 https://polyformproject.org/licenses/noncommercial/1.0.0
 
 Author: Flavio Pendolino
-Version: 1.1
+Version: 1.2
 License: PolyForm Noncommercial 1.0.0
 Commercial use: penfla@me.com
 Purpose: Project, task, resource and request management for a chemical/polymer laboratory.
-Method: Single-file HTML, vanilla JavaScript; data in browser localStorage; sessions saved as local snapshots or JSON files. Deterministic calculations.
+Method: Single-file HTML, vanilla JavaScript; data in browser localStorage, optional autosave to a user-chosen folder (File System Access API); sessions saved as local snapshots or JSON files; task export as .xlsx (OOXML written in-page). Deterministic calculations.
 Disclaimer: validate the results against your own reference samples before any analytical, engineering, safety or regulatory use.
 Third-party components: IBM Plex Sans, IBM Plex Mono, Bricolage Grotesque (Google Fonts, SIL OFL 1.1).
 Scientific references: ASTM D3418, ISO 11357-3, ISO 1133-1, ISO 527-3, ASTM D3985 (cited in the templates).
@@ -215,7 +215,7 @@ function opt(arr,val){return arr.map(function(a){var v=Array.isArray(a)?a[0]:a,l
 
 /* ---------- state ---------- */
 var S;
-function defaultUI(){var d=new Date();return {view:'dashboard',theme:'light',saved:0,tview:'list',q:'',fp:'',fa:'',fs:'',group:'none',cal:d.getFullYear()+'-'+pad(d.getMonth()+1),widgets:{kpi:1,status:1,hours:1,load:1,upcoming:1,conflicts:1,assistant:1},doc:null,drawer:null,confirmDel:null,ap:null,tpl:null,rb:{name:'',tt:'status_to',tv:'Done',ct:'none',cv:'',at:'notify',av:''}}}
+function defaultUI(){var d=new Date();return {view:'dashboard',theme:'light',saved:0,tview:'list',q:'',fp:'',fa:'',fs:'',fpr:'',fdf:'',fdt:'',group:'none',cal:d.getFullYear()+'-'+pad(d.getMonth()+1),widgets:{kpi:1,status:1,hours:1,load:1,upcoming:1,conflicts:1,assistant:1},doc:null,drawer:null,confirmDel:null,ap:null,tpl:null,rb:{name:'',tt:'status_to',tv:'Done',ct:'none',cv:'',at:'notify',av:''}}}
 function seed(){
   var B=mondayOf(TODAY());
   var D=function(n){return normWD(addD(B,n))};
@@ -284,12 +284,14 @@ function normSession(o){
   if(!TVIEWS.some(function(n){return n[0]===u.tview}))u.tview='list';
   if(['light','dark','auto'].indexOf(u.theme)<0)u.theme='light';
   if(!/^\d{4}-\d{2}$/.test(S1(u.cal)))u.cal=defaultUI().cal;
-  ['q','fp','fa','fs','group'].forEach(function(k){u[k]=S1(u[k])});
+  ['q','fp','fa','fs','fpr','group'].forEach(function(k){u[k]=S1(u[k])});
+  ['fdf','fdt'].forEach(function(k){u[k]=DT.test(S1(u[k]))?u[k]:''});
   u.rb=defaultUI().rb;u.drawer=null;u.confirmDel=null;u.confirmReset=false;u.confirmSnap=null;u.tpl=null;u.doc=u.doc?S1(u.doc):null;u.ap=u.ap?S1(u.ap):null;
   o.ui=u;return o}
 function load(){try{var r=localStorage.getItem(LS);if(r){var o=normSession(JSON.parse(r));if(o)return o}}catch(e){}return null}
-function savedText(){if(!lsOK)return 'Autosave unavailable: save to a file.';return S&&S.ui&&S.ui.saved?'Autosaved at '+new Date(S.ui.saved).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}):'Ready'}
-function save(){S.ui.saved=Date.now();try{localStorage.setItem(LS,JSON.stringify(S));lsOK=true}catch(e){lsOK=false}var el=document.getElementById('sv');if(el)el.textContent=savedText()}
+function hhmm(ts){return new Date(ts).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}
+function savedText(){var f=FS&&FS.h&&FS.on?(FS.err?' · folder: error':FS.last?' · folder '+hhmm(FS.last):' · folder: pending'):'';if(!lsOK)return 'Browser autosave unavailable: save to a file.'+f;return S&&S.ui&&S.ui.saved?'Autosaved at '+hhmm(S.ui.saved)+f:'Ready'}
+function save(){S.ui.saved=Date.now();try{localStorage.setItem(LS,JSON.stringify(S));lsOK=true}catch(e){lsOK=false}var el=document.getElementById('sv');if(el)el.textContent=savedText();folderSchedule()}
 function applyTheme(){var t=S&&S.ui&&S.ui.theme||'light',r=document.documentElement;if(t==='auto')r.removeAttribute('data-theme');else r.setAttribute('data-theme',t)}
 var SNAPK='labpm_snaps_v1';
 function getSnaps(){try{var a=JSON.parse(localStorage.getItem(SNAPK));return Array.isArray(a)?a.filter(function(s){return s&&typeof s.id==='string'&&ID.test(s.id)}):[]}catch(e){return []}}
@@ -397,14 +399,14 @@ function render(){
   var rt=S.tasks.find(function(t){return t.timer&&t.timer.user===S.me});
   var nav=NAV.map(function(g){return '<div class="ng">'+g[0]+'</div>'+g[1].map(function(n){return '<button class="nv" data-act="nav" data-v="'+n[0]+'"'+(v===n[0]?' aria-current="page"':'')+'>'+n[1]+'</button>'}).join('')}).join('');
   var th=[['light','Light'],['dark','Dark'],['auto','Auto']].map(function(x){return '<button data-act="theme" data-v="'+x[0]+'" aria-pressed="'+(S.ui.theme===x[0])+'">'+x[1]+'</button>'}).join('');
-  $('#app').innerHTML='<div class="app"><nav class="side" aria-label="Sections"><div class="brand">LabPM<small>v1.1 · chemical laboratory</small></div>'+nav+
+  $('#app').innerHTML='<div class="app"><nav class="side" aria-label="Sections"><div class="brand">LabPM<small>v1.2 · chemical laboratory</small></div>'+nav+
     '<div class="sess"><div class="small muted" id="sv">'+esc(savedText())+'</div><button class="btn sm" data-act="nav" data-v="session">Save or open session</button></div></nav>'+
     '<main class="main"><header class="top"><div><h1>'+esc(titles[v])+'</h1><p class="sub">'+esc(DESC[v]||'')+'</p></div><div class="topr">'+
     (rt?'<button class="btn tmr" id="tb" data-act="open" data-id="'+rt.id+'"><span class="rec"></span><span id="tbt">'+elapsed(rt)+'</span></button>':'')+
     '<div class="seg" role="group" aria-label="Theme">'+th+'</div>'+
     '<label class="who">User <select data-ch="me">'+opt(S.users.map(function(u){return [u.id,u.name+' · '+u.role]}),S.me)+'</select></label></div></header>'+
     '<div id="vb">'+body()+'</div>'+
-    '<footer class="foot">© 2026 Flavio Pendolino | <a href="https://polyformproject.org/licenses/noncommercial/1.0.0" target="_blank" rel="noopener">PolyForm Noncommercial 1.0.0</a> · LabPM v1.1 · data stays in this browser until you save the session to a file</footer></main></div>'}
+    '<footer class="foot">© 2026 Flavio Pendolino | <a href="https://polyformproject.org/licenses/noncommercial/1.0.0" target="_blank" rel="noopener">PolyForm Noncommercial 1.0.0</a> · LabPM v1.2 · data stays in this browser until you save the session to a file</footer></main></div>'}
 function renderBody(){var e=$('#vb');if(e)e.innerHTML=body()}
 function commit(){save();renderBody();renderDrawer();var tb=$('#tb');if(!tb&&S.tasks.some(function(t){return t.timer&&t.timer.user===S.me})||tb&&!S.tasks.some(function(t){return t.timer&&t.timer.user===S.me}))render()}
 function body(){switch(S.ui.view){case 'dashboard':return vDash();case 'portfolio':return vPort();case 'tasks':return vTasks();case 'requests':return vReq();case 'docs':return vDocs();case 'automations':return vAuto();case 'templates':return vTpl();case 'session':return vSession();case 'settings':return vSet();default:return vInfo()}}
@@ -449,14 +451,18 @@ function vPort(){
    (isPM()?'<div class="form" style="margin-top:12px"><label>Goal<input id="ng-name" placeholder="E.g. Validate the FTIR method"></label><label>Due date<input type="date" id="ng-date" value="'+addD(TODAY(),30)+'"></label><label>Linked projects<select id="ng-p" multiple size="3">'+opt(pOpts())+'</select></label><label class="full"><button class="btn pri" data-act="goaladd" style="width:max-content">Add goal</button></label></div>':'')+'<p class="small muted" style="margin:10px 0 0">Progress is the average of the linked projects, weighted by task estimated hours.</p></section>'}
 
 /* ---------- tasks: toolbar and views ---------- */
-function filtered(){var q=S.ui.q.toLowerCase();return S.tasks.filter(function(t){return (!S.ui.fp||t.projectId===S.ui.fp)&&(!S.ui.fa||(S.ui.fa==='_'?!t.assignee:t.assignee===S.ui.fa))&&(!S.ui.fs||t.status===S.ui.fs)&&(!q||(t.title+' '+t.tags.join(' ')).toLowerCase().indexOf(q)>=0)})}
+function filtered(){var q=S.ui.q.toLowerCase();return S.tasks.filter(function(t){return (!S.ui.fp||t.projectId===S.ui.fp)&&(!S.ui.fa||(S.ui.fa==='_'?!t.assignee:t.assignee===S.ui.fa))&&(!S.ui.fs||t.status===S.ui.fs)&&(!S.ui.fpr||t.priority===S.ui.fpr)&&(!S.ui.fdf||t.due>=S.ui.fdf)&&(!S.ui.fdt||t.due<=S.ui.fdt)&&(!q||(t.title+' '+t.tags.join(' ')).toLowerCase().indexOf(q)>=0)})}
 function vTasks(){var u=S.ui;
   return '<div class="tools"><div class="seg" role="group" aria-label="View">'+TVIEWS.map(function(v){return '<button data-act="tview" data-v="'+v[0]+'" aria-pressed="'+(u.tview===v[0])+'">'+v[1]+'</button>'}).join('')+'</div>'+
    '<input type="search" id="q" data-in="q" placeholder="Search" value="'+esc(u.q)+'" style="width:150px">'+
    '<select data-ch="fp" aria-label="Project">'+opt([['','All projects']].concat(pOpts()),u.fp)+'</select>'+
    '<select data-ch="fa" aria-label="Assignee">'+opt([['','Everyone'],['_','Unassigned']].concat(S.users.map(function(x){return [x.id,x.name]})),u.fa)+'</select>'+
    '<select data-ch="fs" aria-label="Status">'+opt([['','All statuses']].concat(STATUSES),u.fs)+'</select>'+
+   '<select data-ch="fpr" aria-label="Priority">'+opt([['','All priorities']].concat(PRIOS),u.fpr)+'</select>'+
+   '<label class="who">Due from <input type="date" data-ch="fdf" value="'+esc(u.fdf)+'"></label><label class="who">to <input type="date" data-ch="fdt" value="'+esc(u.fdt)+'"></label>'+
+   (u.q||u.fp||u.fa||u.fs||u.fpr||u.fdf||u.fdt?'<button class="btn" data-act="clearf">Clear filters</button>':'')+
    (u.tview==='list'?'<select data-ch="group" aria-label="Group by">'+opt([['none','No grouping'],['status','By status'],['project','By project'],['assignee','By person'],['priority','By priority']],u.group)+'</select>':'')+
+   '<button class="btn" data-act="xlsx" id="xl" title="Exports the tasks matching the filters above">Export Excel (<span id="xln">'+filtered().length+'</span>)</button>'+
    (isPM()?'<button class="btn pri" data-act="newtask">+ Task</button>':'')+'</div><div id="tv">'+tv()+'</div>'}
 function tv(){switch(S.ui.tview){case 'board':return vBoard();case 'timeline':return vTL();case 'calendar':return vCal();case 'workload':return vWL();default:return vList()}}
 function vList(){var ts=filtered(),g=S.ui.group,cols=8+S.fields.length;
@@ -589,7 +595,7 @@ function vSet(){var ad=isAdmin(),json='';
 
 /* ---------- info and license ---------- */
 function vInfo(){
-  return '<section class="card"><h2>Information</h2><dl class="ib"><dt>Author</dt><dd>Flavio Pendolino</dd><dt>Version</dt><dd>1.1</dd><dt>License</dt><dd>PolyForm Noncommercial 1.0.0</dd><dt>Commercial use</dt><dd>penfla@me.com</dd>'+
+  return '<section class="card"><h2>Information</h2><dl class="ib"><dt>Author</dt><dd>Flavio Pendolino</dd><dt>Version</dt><dd>1.2</dd><dt>License</dt><dd>PolyForm Noncommercial 1.0.0</dd><dt>Commercial use</dt><dd>penfla@me.com</dd>'+
    '<dt>Purpose</dt><dd>Project, task, resource and request management in a chemical/polymer laboratory, with the typical features of Asana and monday.com.</dd>'+
    '<dt>Method</dt><dd>Single-file HTML with vanilla JavaScript; data in browser localStorage; finish-to-start date cascade on working days; workload = remaining hours spread over working days; sessions saved as browser snapshots or JSON files.</dd>'+
    '<dt>Disclaimer</dt><dd>validate the results against your own reference samples before any analytical, engineering, safety or regulatory use.</dd>'+
@@ -610,6 +616,7 @@ function vSession(){
    '<section class="card"><h2>Save the session</h2><div class="form"><label class="full">Name<input id="ss-name" placeholder="E.g. Campaign 03, end of week" maxlength="80"></label>'+
    '<label class="full"><span class="row" style="flex-wrap:wrap"><button class="btn pri" data-act="snapsave">Save in browser</button><button class="btn" data-act="savefile">Save to file (.json)</button></span></label></div>'+
    '<p class="small muted" style="margin:10px 0 0">The session includes projects, tasks, hours, documents, rules, fields, people and settings. Up to '+MAXSNAP+' sessions in the browser; the file is for moving your work to another computer.</p></section></div>'+
+   vFolder()+
    '<section class="card"><h2>Sessions saved in the browser</h2>'+(rows?'<div class="tbw"><table class="tbl" style="min-width:600px"><thead><tr><th>Name</th><th>Saved</th><th>Content</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="muted">No saved sessions. Use "Save in browser" to create one.</p>')+
    '<p class="small muted" style="margin:10px 0 0">Restoring replaces the current data (Admin only) and first creates an automatic copy. Running timers are not restored.</p></section>'+
    '<section class="card"><h2>Open from file</h2><div class="form"><label class="full">Session file (.json)<input type="file" id="sf" accept=".json,application/json" data-ch="openfile"'+(ad?'':' disabled')+'></label></div>'+
@@ -654,6 +661,88 @@ function renderDrawer(){
    '</div></div>';
   var np=$('#drpanel');if(np)np.scrollTop=sc}
 
+
+/* ---------- Excel export (OOXML written in-page, store-only ZIP) ---------- */
+var CRCT=(function(){var t=[],c,n,k;for(n=0;n<256;n++){c=n;for(k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+function crc32(b){var c=0xFFFFFFFF;for(var i=0;i<b.length;i++)c=CRCT[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0}
+function zipStore(files){var enc=new TextEncoder(),parts=[],cd=[],off=0;
+  files.forEach(function(f){var nm=enc.encode(f[0]),d=enc.encode(f[1]),crc=crc32(d);
+    var lh=new DataView(new ArrayBuffer(30));lh.setUint32(0,0x04034b50,true);lh.setUint16(4,20,true);lh.setUint16(6,0x0800,true);lh.setUint16(12,0x21,true);lh.setUint32(14,crc,true);lh.setUint32(18,d.length,true);lh.setUint32(22,d.length,true);lh.setUint16(26,nm.length,true);
+    parts.push(new Uint8Array(lh.buffer),nm,d);
+    var ch=new DataView(new ArrayBuffer(46));ch.setUint32(0,0x02014b50,true);ch.setUint16(4,20,true);ch.setUint16(6,20,true);ch.setUint16(8,0x0800,true);ch.setUint16(14,0x21,true);ch.setUint32(16,crc,true);ch.setUint32(20,d.length,true);ch.setUint32(24,d.length,true);ch.setUint16(28,nm.length,true);ch.setUint32(42,off,true);
+    cd.push(new Uint8Array(ch.buffer),nm);off+=30+nm.length+d.length});
+  var cs=0;cd.forEach(function(x){cs+=x.length});
+  var e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+  return new Blob(parts.concat(cd,[new Uint8Array(e.buffer)]),{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})}
+var xe=function(x){return String(x==null?'':x).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+var colN=function(i){var s='';i++;while(i>0){var m=(i-1)%26;s=String.fromCharCode(65+m)+s;i=Math.floor((i-1)/26)}return s};
+var xSerial=function(d){var a=d.split('-').map(Number);return Math.round((Date.UTC(a[0],a[1]-1,a[2])-Date.UTC(1899,11,30))/864e5)};
+/* cell: string -> text; {n:number} -> number; {d:'YYYY-MM-DD'} -> date; null -> empty */
+function xCell(c,r,i,hd){var ref=colN(i)+r;if(c==null||c==='')return '';
+  if(hd)return '<c r="'+ref+'" s="1" t="inlineStr"><is><t>'+xe(c)+'</t></is></c>';
+  if(typeof c==='object'&&c.n!=null)return isFinite(c.n)?'<c r="'+ref+'" s="3"><v>'+c.n+'</v></c>':'';
+  if(typeof c==='object'&&c.d)return '<c r="'+ref+'" s="2"><v>'+xSerial(c.d)+'</v></c>';
+  return '<c r="'+ref+'" t="inlineStr"><is><t xml:space="preserve">'+xe(c)+'</t></is></c>'}
+function xSheet(rows,widths,filter){var out='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0">'+(filter?'<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>':'')+'</sheetView></sheetViews><cols>'+widths.map(function(w,i){return '<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+w+'" customWidth="1"/>'}).join('')+'</cols><sheetData>';
+  rows.forEach(function(r,ri){out+='<row r="'+(ri+1)+'">'+r.map(function(c,i){return xCell(c,ri+1,i,filter&&ri===0)}).join('')+'</row>'});
+  out+='</sheetData>'+(filter&&rows.length?'<autoFilter ref="A1:'+colN(rows[0].length-1)+rows.length+'"/>':'')+'</worksheet>';return out}
+function buildXlsx(tasks,info){
+  var cfs=S.fields,hd=['Title','Project','Status','Assignee','Priority','Start','Due','Estimated h','Logged h','Overdue','Blocked','Depends on','Tags'].concat(cfs.map(function(f){return f.name}),['Requester','Notes']);
+  var rows=[hd];
+  tasks.forEach(function(t){var p=P(t.projectId);
+    var cv=cfs.map(function(f){if(f.type==='formula'){var r=calc(t,f);return r==null?null:{n:r}}var v=t.cf[f.id];if(v==null||v==='')return null;if(f.type==='number')return isFinite(parseFloat(v))?{n:parseFloat(v)}:String(v);if(f.type==='date')return DT.test(String(v))?{d:v}:String(v);if(f.type==='checkbox')return v?'Yes':'No';return String(v)});
+    rows.push([t.title,p?p.name:'',t.status,t.assignee?uname(t.assignee):'',t.priority,{d:t.start},{d:t.due},{n:t.est},{n:Math.round(logged(t)*100)/100},isOver(t)?'Yes':'No',isBlocked(t)&&t.status!=='Done'?'Yes':'No',t.deps.map(function(d){var x=T(d);return x?x.title:''}).filter(Boolean).join('; '),t.tags.join(', ')].concat(cv,[t.requester||'',t.notes||'']))});
+  var w=[38,30,13,14,10,12,12,12,10,9,9,34,18].concat(cfs.map(function(){return 16}),[16,40]);
+  var ws1=xSheet(rows,w,true),ws2=xSheet(info,[26,60],false),X='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  var ns='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  return zipStore([
+   ['[Content_Types].xml',X+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/></Types>'],
+   ['_rels/.rels',X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+   ['xl/workbook.xml',X+'<workbook '+ns+'><sheets><sheet name="Tasks" sheetId="1" r:id="rId1"/><sheet name="Export info" sheetId="2" r:id="rId2"/></sheets></workbook>'],
+   ['xl/_rels/workbook.xml.rels',X+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+   ['xl/styles.xml',X+'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy\\-mm\\-dd"/></numFmts><fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD6ECEF"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="4"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/><xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/><xf numFmtId="2" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>'],
+   ['xl/worksheets/sheet1.xml',ws1],['xl/worksheets/sheet2.xml',ws2]])}
+/* save a Blob: native "Save as" dialog (starts in the backup folder if connected) or plain download */
+function saveBlob(blob,fn,desc,ext,mime){
+  if(typeof window.showSaveFilePicker==='function'){var o={suggestedName:fn,types:[{description:desc,accept:{[mime]:[ext]}}]};if(FS.h)o.startIn=FS.h;
+    return window.showSaveFilePicker(o).then(function(h){return h.createWritable().then(function(w){return w.write(blob).then(function(){return w.close()})})}).then(function(){return true},function(er){if(er&&er.name==='AbortError')return false;return dl(blob,fn)})}
+  return Promise.resolve(dl(blob,fn))}
+function dl(blob,fn){var url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url)},1000);return true}
+function exportTasks(){var ts=filtered().slice().sort(function(a,b){var pa=S.projects.indexOf(P(a.projectId)),pb=S.projects.indexOf(P(b.projectId));return pa!==pb?pa-pb:(a.start<b.start?-1:a.start>b.start?1:0)}),u=S.ui;
+  if(!ts.length){toast('No tasks match the filters: nothing to export.');return}
+  var pn=u.fp?(P(u.fp)||{}).name:'All',an=u.fa==='_'?'Unassigned':u.fa?uname(u.fa):'Everyone';
+  var info=[['Application','LabPM v1.2'],['Exported at',new Date().toLocaleString('en-GB')],['Exported by',me().name+' ('+me().role+')'],['Rows',{n:ts.length}],['',''],['Filter','Value'],['Search',u.q||'(none)'],['Project',pn],['Assignee',an],['Status',u.fs||'All'],['Priority',u.fpr||'All'],['Due from',u.fdf||'(none)'],['Due to',u.fdt||'(none)']];
+  var fn='labpm-tasks-'+TODAY()+'.xlsx';
+  saveBlob(buildXlsx(ts,info),fn,'Excel workbook','.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').then(function(ok){if(ok){log('Exported '+ts.length+' tasks to Excel');save();toast('Exported '+ts.length+' tasks to '+fn)}})}
+
+/* ---------- backup folder (File System Access API, Chromium) ---------- */
+var FSOK=typeof window.showDirectoryPicker==='function';
+var FS={h:null,pending:null,on:false,err:'',last:0,timer:null,q:Promise.resolve()};
+function idbDo(mode,fn){return new Promise(function(res,rej){var r=indexedDB.open('labpm_fs',1);r.onupgradeneeded=function(){r.result.createObjectStore('h')};r.onerror=function(){rej(r.error)};r.onsuccess=function(){try{var tx=r.result.transaction('h',mode),q=fn(tx.objectStore('h'));tx.oncomplete=function(){res(q&&q.result)};tx.onerror=function(){rej(tx.error)}}catch(e){rej(e)}}})}
+var stamp=function(){var d=new Date();return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate())+'-'+pad(d.getHours())+pad(d.getMinutes())+pad(d.getSeconds())};
+function fsWrite(h,name,txt){return h.getFileHandle(name,{create:true}).then(function(fh){return fh.createWritable()}).then(function(w){return w.write(txt).then(function(){return w.close()})})}
+function folderInit(){if(!FSOK)return;
+  idbDo('readonly',function(st){return st.get('dir')}).then(function(h){if(!h)return;
+    var on=true;try{on=localStorage.getItem('labpm_fs_on')!=='0'}catch(e){}
+    return h.queryPermission({mode:'readwrite'}).then(function(p){if(p==='granted'){FS.h=h;FS.on=on;folderNow(false)}else{FS.pending=h}})}).catch(function(){}).then(function(){if(S.ui.view==='session')renderBody()})}
+function folderSchedule(){if(!FS.h||!FS.on)return;clearTimeout(FS.timer);FS.timer=setTimeout(function(){folderNow(false)},800)}
+function folderNow(copy){if(!FS.h)return Promise.resolve();var h=FS.h,txt=JSON.stringify(snapData(),null,1);
+  FS.q=FS.q.then(function(){return fsWrite(h,'labpm-autosave.json',txt)}).then(function(){if(copy)return fsWrite(h,'labpm-copy-'+stamp()+'.json',txt)}).then(function(){FS.err='';FS.last=Date.now()},function(er){FS.err=(er&&er.message)||'write failed';FS.on=false}).then(function(){var el=document.getElementById('sv');if(el)el.textContent=savedText();if(S.ui.view==='session')renderBody();if(FS.err)toast('Folder autosave stopped: '+FS.err)});
+  return FS.q}
+function folderConnect(h){FS.h=h;FS.pending=null;FS.on=true;FS.err='';try{localStorage.setItem('labpm_fs_on','1')}catch(e){}
+  idbDo('readwrite',function(st){return st.put(h,'dir')}).catch(function(){});
+  /* snapshot of the database as it is BEFORE any further editing, then continuous autosave */
+  var txt=JSON.stringify(snapData(),null,1);
+  return fsWrite(h,'labpm-initial-'+stamp()+'.json',txt).then(function(){return folderNow(false)}).then(function(){log('Backup folder connected: '+h.name);save();toast('Initial copy saved in "'+h.name+'". Autosave is on.')},function(er){FS.err=(er&&er.message)||'write failed';FS.on=false;toast('Cannot write to folder: '+FS.err)}).then(function(){renderBody()})}
+function vFolder(){var h='<section class="card"><h2>Backup folder (autosave every change)</h2>';
+  if(!FSOK)return h+'<p class="muted" style="margin:0">Folder access is not available in this browser (it needs a Chromium-based browser such as Chrome or Edge). Use <b>Save to file</b> above to keep a backup.</p></section>';
+  var st,btn='';
+  if(FS.h){st=FS.err?'<span class="flag bad">error</span> '+esc(FS.err):FS.on?'<span class="flag good">on</span> Writing <span class="mono">labpm-autosave.json</span> in <b>'+esc(FS.h.name)+'</b> after every change'+(FS.last?' (last write '+hhmm(FS.last)+')':'')+'.':'<span class="flag warn">paused</span> Folder <b>'+esc(FS.h.name)+'</b> is connected but autosave is paused.';
+    btn='<button class="btn pri" data-act="foldernow">Save timestamped copy now</button><button class="btn" data-act="foldertoggle">'+(FS.on?'Pause autosave':'Resume autosave')+'</button><button class="btn" data-act="foldersel">Change folder…</button><button class="btn dng" data-act="foldernone">Disconnect</button>'}
+  else if(FS.pending){st='Folder <b>'+esc(FS.pending.name)+'</b> was used before. The browser needs your permission again.';btn='<button class="btn pri" data-act="folderre">Reconnect folder</button><button class="btn" data-act="foldersel">Choose another folder…</button>'}
+  else{st='Not connected. Choose a folder <b>before you start entering data</b>: an initial copy of the current database is written there, then every change is saved automatically.';btn='<button class="btn pri" data-act="foldersel">Choose folder…</button>'}
+  return h+'<p style="margin:0 0 10px">'+st+'</p><div class="tools">'+btn+'</div><p class="small muted" style="margin:10px 0 0">Files: <span class="mono">labpm-initial-&lt;date&gt;.json</span> (copy at connection), <span class="mono">labpm-autosave.json</span> (always the latest state), <span class="mono">labpm-copy-&lt;date&gt;.json</span> (manual copies). They are plain, unencrypted JSON: choose a folder with appropriate access control. Reopen any of them with <i>Open from file</i>. The browser asks permission again after a restart.</p></section>'}
+
 /* ---------- actions ---------- */
 function defVal(type){return {status_to:'Done',set_status:'In progress',priority:'High',set_priority:'High',project:S.projects[0]?S.projects[0].id:'',set_assignee:''}[type]||''}
 function go(view){S.ui.view=view;S.ui.drawer=null;save();render();renderDrawer();window.scrollTo(0,0)}
@@ -674,6 +763,13 @@ var A={
  savefile:function(){var txt=JSON.stringify(snapData(),null,1),fn='labpm-session-'+TODAY()+'.json';
   try{var bl=new Blob([txt],{type:'application/json'}),url=URL.createObjectURL(bl),a=document.createElement('a');a.href=url;a.download=fn;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(function(){URL.revokeObjectURL(url)},1000);toast('Session saved to file.')}
   catch(x){download(txt,'Session JSON')}},
+ xlsx:function(){exportTasks()},
+ clearf:function(){var u=S.ui;u.q='';u.fp='';u.fa='';u.fs='';u.fpr='';u.fdf='';u.fdt='';save();renderBody()},
+ foldersel:function(){window.showDirectoryPicker({mode:'readwrite',id:'labpm',startIn:'documents'}).then(folderConnect,function(er){if(!er||er.name!=='AbortError')toast('Cannot open folder: '+((er&&er.message)||'denied'))})},
+ folderre:function(){var h=FS.pending;if(!h)return;h.requestPermission({mode:'readwrite'}).then(function(p){if(p==='granted')return folderConnect(h);toast('Permission not granted.')},function(){toast('Permission not granted.')})},
+ foldernow:function(){folderNow(true).then(function(){if(!FS.err)toast('Copy saved in "'+FS.h.name+'".')})},
+ foldertoggle:function(){FS.on=!FS.on;FS.err='';try{localStorage.setItem('labpm_fs_on',FS.on?'1':'0')}catch(e){}if(FS.on)folderNow(false);renderBody();var el=document.getElementById('sv');if(el)el.textContent=savedText()},
+ foldernone:function(){FS.h=null;FS.pending=null;FS.on=false;FS.err='';idbDo('readwrite',function(st){return st.delete('dir')}).catch(function(){});renderBody();var el=document.getElementById('sv');if(el)el.textContent=savedText()},
  tview:function(e){S.ui.tview=e.dataset.v;save();renderBody()},
  open:function(e){S.ui.drawer=e.dataset.id;S.ui.confirmDel=null;renderDrawer()},
  close:function(){S.ui.drawer=null;S.ui.confirmDel=null;renderDrawer()},
@@ -737,6 +833,7 @@ var H={
  me:function(e){S.me=e.value;S.ui.drawer=null;save();render();renderDrawer()},
  fp:function(e){S.ui.fp=e.value;save();renderBody()},fa:function(e){S.ui.fa=e.value;save();renderBody()},fs:function(e){S.ui.fs=e.value;save();renderBody()},
  group:function(e){S.ui.group=e.value;save();renderBody()},
+ fpr:function(e){S.ui.fpr=e.value;save();renderBody()},fdf:function(e){S.ui.fdf=e.value;save();renderBody()},fdt:function(e){S.ui.fdt=e.value;save();renderBody()},
  widget:function(e){S.ui.widgets[e.dataset.k]=e.checked?1:0;save();renderBody()},
  ap:function(e){S.ui.ap=e.value;renderBody()},
  pstat:function(e){var p=P(e.dataset.id);if(p&&isPM()){p.status=e.value;save();renderBody()}},
@@ -764,7 +861,11 @@ var H={
 /* ---------- events ---------- */
 document.addEventListener('click',function(ev){var e=ev.target.closest('[data-act]');if(!e)return;var a=A[e.dataset.act];if(a){if(e.tagName==='A')ev.preventDefault();a(e,ev)}});
 document.addEventListener('change',function(ev){var e=ev.target.closest('[data-ch]');if(!e)return;var h=H[e.dataset.ch];if(h)h(e)});
-document.addEventListener('input',function(ev){var e=ev.target;if(e.matches&&e.matches('[data-in="q"]')){S.ui.q=e.value;$('#tv').innerHTML=tv()}});
+document.addEventListener('input',function(ev){var e=ev.target;if(e.matches&&e.matches('[data-in="q"]')){S.ui.q=e.value;$('#tv').innerHTML=tv();var n=$('#xln');if(n)n.textContent=filtered().length;save();return}
+  /* autosave every keystroke in free-text fields (state only; no re-render, so focus is kept) */
+  var c=e.dataset&&e.dataset.ch,f=e.dataset&&e.dataset.f;
+  if(c==='dr'&&f==='notes'){var t=T(S.ui.drawer);if(t&&canEdit(t)){t.notes=e.value;save()}}
+  else if(c==='docf'&&(f==='body'||f==='title')){var d=S.docs.find(function(x){return x.id===S.ui.doc});if(d&&(isPM()||role()==='Researcher')){d[f]=e.value;d.updated=Date.now();save()}}});
 document.addEventListener('keydown',function(ev){if(ev.key==='Escape'&&S.ui.drawer)A.close()});
 document.addEventListener('dragstart',function(ev){var e=ev.target.closest('[data-drag]');if(e){try{ev.dataTransfer.setData('text/plain',e.dataset.drag);ev.dataTransfer.effectAllowed='move'}catch(x){}}});
 document.addEventListener('dragover',function(ev){var c=ev.target.closest('[data-drop]');if(c){ev.preventDefault();c.classList.add('over')}});
@@ -773,7 +874,7 @@ document.addEventListener('drop',function(ev){var c=ev.target.closest('[data-dro
 
 /* ---------- startup ---------- */
 S=load()||seed();
-applyTheme();checkOverdue();save();render();renderDrawer();
+applyTheme();checkOverdue();save();render();renderDrawer();folderInit();
 setInterval(function(){var t=S.tasks.find(function(x){return x.timer&&x.timer.user===S.me}),b=$('#tbt');if(t&&b)b.textContent=elapsed(t)},1000);
 setInterval(function(){if(checkOverdue()){renderBody()}},60000);
 })();

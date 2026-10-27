@@ -8,11 +8,13 @@ Feature set modelled on dependent tasks, instrument conflicts, hours per person,
 |---|---|
 | Live demo | https://penfla.github.io/labpm/ (after enabling GitHub Pages, see [Deployment](#deployment)) |
 | Repository | https://github.com/penfla/labpm |
-| Version | 1.1.0 |
+| Version | 1.2.0 |
 | Licence | [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0) |
 | Commercial use | penfla@me.com |
 
 ![Dashboard](docs/img/dashboard.png)
+
+![Task filters and Excel export](docs/img/tasks-export.png)
 
 ## Features
 
@@ -29,7 +31,9 @@ Feature set modelled on dependent tasks, instrument conflicts, hours per person,
 | Portfolio | Project health (auto: *At risk* if any task overdue), weighted progress, goals linked to projects |
 | Documents | Markdown-lite notes linked to projects / tasks |
 | Roles | Admin, Project manager, Researcher, Viewer (UI-level, see [limitations](#limitations)) |
-| Sessions | Autosave in `localStorage`; up to 12 named snapshots; export/import as `.json` |
+| Autosave | Every change (including each keystroke in notes/documents) is written to `localStorage`. Optional **backup folder** of your choice: initial copy of the database on connection, then `labpm-autosave.json` updated after every change (Chromium browsers) |
+| Excel export | **Export Excel** on the Tasks page writes the tasks matching the current filters (search, project, assignee, status, priority, due-date range) to `.xlsx` with header, frozen row, autofilter, real dates and numbers, plus an *Export info* sheet listing the filters |
+| Sessions | Up to 12 named snapshots in the browser; export/import as `.json` |
 | Theme | Light / dark / auto |
 
 More screenshots: [timeline](docs/img/timeline.png) · [board](docs/img/board.png) · [automations](docs/img/automations.png) · [templates](docs/img/templates.png)
@@ -52,7 +56,8 @@ Sample data is seeded relative to the current week on first load. *Settings → 
 ## Data and persistence
 
 - State lives in the browser's `localStorage` (`labpm_v1`); snapshots in `labpm_snaps_v1`. Nothing is sent to any server.
-- Browsers can evict storage. **Use *Session → Save to file (.json)* as the reliable backup**, and to move work between computers.
+- Browsers can evict storage. **Connect a backup folder (*Session → Backup folder → Choose folder…*) before you start entering data**: LabPM writes `labpm-initial-<date>.json` (state at connection) and then keeps `labpm-autosave.json` current after every change. Requires a Chromium-based browser (Chrome, Edge); the browser asks permission again after a restart. Elsewhere use *Session → Save to file (.json)*, which is also how you move work between computers.
+- Files in the folder are plain, unencrypted JSON: pick a folder with suitable access control (NDA data).
 - Opening a file or restoring a snapshot replaces current data (Admin only) after an automatic snapshot. Imported JSON is validated and sanitised (`normSession`).
 - Schema: [docs/DATA_MODEL.md](docs/DATA_MODEL.md).
 
@@ -81,12 +86,13 @@ npx playwright install chromium
 npm test
 ```
 
-Playwright smoke tests (`tests/smoke.test.js`): all views render without JS errors, English-only UI, request intake, template instantiation with dependency arrows, session export, role restriction. CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+Playwright smoke tests (`tests/smoke.test.js`): all views render without JS errors, English-only UI, request intake, template instantiation with dependency arrows, session export, role restriction, filtered Excel export, backup-folder initial copy and per-keystroke autosave (in-memory folder stub). CI: [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ## Limitations
 
 - **Single-browser, single-user storage.** There is no sync or multi-user concurrency. Sharing = exchange a session `.json`.
 - **Roles are simulated in the UI** (user switcher in the top bar). Without a server they are a workflow aid, not an access-control measure.
+- Folder autosave and the native *Save as* dialog use the File System Access API: Chromium only (Firefox/Safari fall back to a normal download and manual *Save to file*).
 - Requests from external users require a shared backend; the intake form only writes to the local browser.
 - Only finish-to-start dependencies; no holiday calendar (weekends are skipped, public holidays are not).
 - ICS export copies the calendar text to the clipboard (due dates of open tasks, all-day events); it does not produce a subscribable feed.
@@ -98,11 +104,11 @@ Playwright smoke tests (`tests/smoke.test.js`): all views render without JS erro
 | | |
 |---|---|
 | Author | Flavio Pendolino |
-| Version | 1.1.0 |
+| Version | 1.2.0 |
 | License | PolyForm Noncommercial 1.0.0 |
 | Commercial use | penfla@me.com |
 | Purpose | Project, task, resource and request management for a chemical/polymer laboratory |
-| Method | Single-file HTML + vanilla JavaScript; data in browser `localStorage`; finish-to-start cascade on working days; workload = remaining hours (estimated − logged) spread uniformly over working days between start and due date; deterministic calculations only |
+| Method | Single-file HTML + vanilla JavaScript; data in browser `localStorage` with optional autosave to a user-chosen folder; task export as `.xlsx` (OOXML written in-page, no library); finish-to-start cascade on working days; workload = remaining hours (estimated − logged) spread uniformly over working days between start and due date; deterministic calculations only |
 | Disclaimer | Validate the results against your own reference samples before any analytical, engineering, safety or regulatory use. |
 | Third-party components | IBM Plex Sans, IBM Plex Mono, Bricolage Grotesque via [Google Fonts](https://fonts.google.com) (SIL OFL 1.1); see [NOTICE.md](NOTICE.md) |
 | Scientific references | ASTM D3418, ISO 11357-3, ISO 1133-1, ISO 527-3, ASTM D3985 (cited in the templates): [iso.org](https://www.iso.org), [astm.org](https://www.astm.org) |

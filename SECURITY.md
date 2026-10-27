@@ -9,12 +9,13 @@ LabPM is a client-side single-page app. It has no server, no accounts, no networ
 | Stored XSS via task titles, notes, documents, field values | All dynamic strings pass through `esc()`; Markdown-lite renderer escapes first and only emits `<h3–h5>, <p>, <ul>/<li>, <b>, <code>, <a>`; links are limited to `http(s)://` with `rel="noopener"` |
 | Malicious session file / pasted JSON | `normSession()` validates schema version, array sizes (≤ 5000), ID pattern `^[A-Za-z0-9_-]{1,40}$`, ISO dates, enumerations; coerces all strings; file size ≤ 5 MB; automatic snapshot before replacement |
 | Formula fields | Recursive-descent arithmetic parser (`+ - * / ()`, numbers); no `eval` / `Function` |
+| Backup folder | Requires a user gesture and the browser's own read/write permission prompt; the app only creates/overwrites files with its own fixed names (`labpm-*.json`) and never reads or lists the folder; handle kept in IndexedDB |
 | Exfiltration | CSP blocks `connect-src`, images (except `data:`), frames, forms |
 
 ## What it is not
 
 - **Roles are not access control.** The user switcher is a UI aid. Anyone with access to the browser profile can read/modify all data, and can edit `localStorage` directly.
-- Data is stored unencrypted in the browser. Do not store confidential/NDA data on shared machines. Session files are plain JSON.
+- Data is stored unencrypted in the browser. Do not store confidential/NDA data on shared machines. Session files and backup-folder files (`labpm-initial-*`, `labpm-autosave.json`, `labpm-copy-*`) are plain JSON: choose a folder with appropriate access control; for cloud-synced folders check your NDA/data-transfer rules.
 
 ## Reporting a vulnerability
 

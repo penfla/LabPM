@@ -1,6 +1,6 @@
 # Architecture
 
-Source of truth: [`index.html`](../index.html) (~100 kB, one IIFE, `'use strict'`).
+Source of truth: [`index.html`](../index.html) (~120 kB, one IIFE, `'use strict'`).
 
 ## 1. Layout of the file
 
@@ -41,9 +41,15 @@ Recursive descent: `expr = term (('+'|'-') term)*`, `term = factor (('*'|'/') fa
 ### Automations (`fire`)
 Filter rules by `on`, trigger type/value and condition; run action; log. `set_status` re-enters `applyStatus` with depth+1; `create_task` fires `created` on the new task with depth+1; depth > 3 returns.
 
+### Excel export (`buildXlsx`, `zipStore`)
+No library. The workbook is generated as OOXML strings (`[Content_Types].xml`, `_rels/.rels`, `xl/workbook.xml`, `xl/styles.xml`, two worksheets; inline strings, dates as serial numbers with `yyyy-mm-dd` format, frozen header, autofilter) and packed with a minimal **store-only ZIP** writer (CRC-32 table, local headers, central directory, EOCD; UTF-8 names flag). Cell text is stripped of XML-illegal control characters and escaped. Verified to open with openpyxl and LibreOffice. Rows come from `filtered()`, the same function used by the five views, so export = what the filters select. Delivery: `showSaveFilePicker` if available (starts in the backup folder), else `<a download>`.
+
+### Backup folder (File System Access API)
+`showDirectoryPicker({mode:'readwrite'})` → handle stored in IndexedDB (`labpm_fs`/`h`/`dir`; structured-cloneable) so it survives reloads; permission is re-requested via `requestPermission` from a click (`Reconnect folder`). `save()` → `folderSchedule()` (800 ms debounce) → `folderNow()` appends to a promise queue `FS.q` that writes `labpm-autosave.json` via `createWritable()` (atomic replace on close). Connection writes `labpm-initial-<stamp>.json` first. Errors set `FS.err`, pause the feature and surface in the UI. Free-text fields additionally save on the `input` event (state only, no re-render, so caret/focus are preserved).
+
 ## 4. Security model
 
-See [SECURITY.md](../SECURITY.md). Key points: `esc()` on all dynamic HTML; `normSession()` as the single gate for any external JSON; no `eval`; CSP without `connect-src`.
+See [SECURITY.md](../SECURITY.md). Key points: folder access only after explicit user gesture and browser permission prompt; files written are plain JSON; `esc()` on all dynamic HTML; `normSession()` as the single gate for any external JSON; no `eval`; CSP without `connect-src`.
 
 ## 5. Design decisions
 

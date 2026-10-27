@@ -1,6 +1,6 @@
 # User guide
 
-Applies to LabPM 1.1.0. Live demo / source: https://github.com/penfla/labpm
+Applies to LabPM 1.2.0. Live demo / source: https://github.com/penfla/labpm
 
 ## 1. Navigation
 
@@ -24,7 +24,7 @@ Widgets can be toggled under *Visible widgets* (preference is saved).
 
 ## 3. Tasks
 
-Toolbar: view switch, search (title + tags), filters (project, assignee, status), grouping (List only), **+ Task** (PM/Admin).
+Toolbar: view switch, search (title + tags), filters (project, assignee, status, priority, due-date range *from / to*), *Clear filters*, grouping (List only), **Export Excel (n)**, **+ Task** (PM/Admin). Filters apply to all five views and persist across reloads.
 
 | View | Notes |
 |---|---|
@@ -33,6 +33,15 @@ Toolbar: view switch, search (title + tags), filters (project, assignee, status)
 | Timeline | Bars = start→due on working-day grid; dark fill = logged / estimated; arrows = dependencies; red line = today |
 | Calendar | Month grid, cards on due date (max 3 per day + counter) |
 | Workload | Hours per person per week for 6 weeks, vs capacity |
+
+### Excel export
+
+**Export Excel (n)** writes the *n* tasks currently matching the filters (all roles). Choose the filters first, then export; the button shows the live row count.
+
+- Browsers with the File System Access API (Chrome, Edge) open a *Save as* dialog (starting in the backup folder if one is connected); others download `labpm-tasks-YYYY-MM-DD.xlsx`.
+- Sheet **Tasks** (sorted by project, then start): Title, Project, Status, Assignee, Priority, Start, Due (real Excel dates), Estimated h, Logged h, Overdue, Blocked, Depends on, Tags, one column per custom field (number/date types preserved; formula fields as computed values), Requester, Notes. Header row styled and frozen, autofilter on.
+- Sheet **Export info**: application version, timestamp, user and role, row count and the filter values used.
+- Values are a snapshot: formulas are exported as numbers, not Excel formulas.
 
 ### Task drawer
 
@@ -143,15 +152,30 @@ Markdown-lite: `# / ## / ###` headings, `- ` lists, `**bold**`, `` `code` ``, ba
 
 Roles are a UI convention (see [SECURITY.md](../SECURITY.md)).
 
-## 11. Sessions and backup
+## 11. Autosave, backup folder and sessions
 
 | Action | Where | Notes |
 |---|---|---|
-| Autosave | automatic | `localStorage`; message in the rail footer |
+| Autosave (browser) | automatic | `localStorage`, on every change and on every keystroke in notes / document title / document text; message in the rail footer |
+| **Backup folder** | Session | See below |
 | Save in browser | Session | Named snapshot, max 12 (oldest dropped); includes `ui` state but not running timers |
 | Save to file | Session | `labpm-session-YYYY-MM-DD.json` download |
 | Restore snapshot / open file | Session | Admin; two-step confirm; automatic snapshot first; ≤ 5 MB |
 | Copy / paste JSON | Session, Settings | Clipboard fallback writes into the text field |
+
+### Backup folder (recommended before you start entering data)
+
+*Session → Backup folder → Choose folder…* (Chromium browsers: Chrome, Edge).
+
+1. Pick any folder (local, network share, cloud-synced folder). The browser asks for read/write permission.
+2. LabPM immediately writes `labpm-initial-YYYYMMDD-HHMMSS.json` — the database **as it was before further editing** — and `labpm-autosave.json`.
+3. From then on `labpm-autosave.json` is rewritten ~0.8 s after every change (writes are queued, so it is always the latest consistent state). The rail footer shows the last folder write time.
+4. *Save timestamped copy now* adds `labpm-copy-YYYYMMDD-HHMMSS.json`; *Pause autosave* / *Resume*, *Change folder…*, *Disconnect* are available.
+5. After closing the browser, LabPM remembers the folder but Chrome asks permission again: use **Reconnect folder**. Until then browser-only autosave continues.
+
+If a write fails (folder removed, disk full, permission revoked) autosave stops, a message is shown and the Session page reports the error; fix the cause and *Resume*. Restore from any of the files with *Open from file* (Admin).
+
+Files are plain unencrypted JSON. Not supported in Firefox/Safari (use *Save to file*).
 
 ## 12. Keyboard and accessibility
 

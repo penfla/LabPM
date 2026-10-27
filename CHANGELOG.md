@@ -2,6 +2,17 @@
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versioning: [SemVer](https://semver.org).
 
+## [1.2.0] — 2026-10-27
+
+### Added
+- **Backup folder**: choose a folder (File System Access API); LabPM saves an initial copy of the database, then rewrites `labpm-autosave.json` after every change; timestamped manual copies; pause/resume/change/disconnect; reconnect after restart.
+- **Excel export** (`.xlsx`) of the task list driven by the filters: project, assignee, status, search, plus new *priority* and *due from / to* filters (and *Clear filters*). Includes an *Export info* sheet. No external library.
+- Per-keystroke autosave for task notes, document title and document text.
+- Tests for filtered export and folder autosave.
+
+### Changed
+- Version 1.2 in header, UI and docs.
+
 ## [1.1.0] — 2026-10-27
 
 First public repository release.
