@@ -2,7 +2,7 @@
 
 Project, task, resource and request manager for chemical / polymer laboratories. Single `index.html`, vanilla JavaScript, no backend, no build step.
 
-Feature set modelled on [Asana](https://asana.com) and [monday.com](https://monday.com), reduced to what a materials lab (extrusion, DSC, FTIR, MFR, OTR, tensile) actually schedules: dependent tasks, instrument conflicts, hours per person, intake requests, calibration/validation templates.
+Feature set modelled on dependent tasks, instrument conflicts, hours per person, intake requests, calibration/validation templates.
 
 | | |
 |---|---|
